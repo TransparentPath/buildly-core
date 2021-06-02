@@ -303,7 +303,7 @@ class CoreUserViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
         }
         template_name = 'email/coreuser/shipment_alert.txt'
         html_template_name = 'email/coreuser/shipment_alert.html'
-        core_users = CoreUser.objects.filter(organization__organization_uuid=org_uuid,email_alert_flag=True)
+        core_users = CoreUser.objects.filter(organization__organization_uuid=org_uuid, email_alert_flag=True)
         for user in core_users:
             email_address = user.email
             send_email(email_address, subject, context, template_name, html_template_name)
@@ -323,6 +323,7 @@ class CoreUserViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
         #                     to=phone_number
         #                 )
         #     print(message.sid)
+
     @action(detail=True, methods=['patch'], name='Update Profile')
     def update_profile(self, request, pk=None, *args, **kwargs):
         """
