@@ -330,11 +330,10 @@ class CoreUserEmailAlertSerializer(serializers.Serializer):
     """
     Serializer for email alert of shipment
     """
-    user_uuid = serializers.UUIDField()
+    organization_uuid = serializers.UUIDField()
     messages = serializers.JSONField()
     subject_line = serializers.CharField(max_length=255)
-    date_time = serializers.DateTimeField()
-
+   
 
 class ConsortiumSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField()
