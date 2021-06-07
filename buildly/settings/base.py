@@ -201,5 +201,5 @@ SWAGGER_SETTINGS = {
 
 ORGANIZATION_TYPES = [
     'Custodian',
-	'Producer'
+    'Producer'
 ]
