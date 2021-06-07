@@ -149,13 +149,14 @@ class CoreUserWritableSerializer(CoreUserSerializer):
                     'organization_name': organization
         }
         if is_new_org:
-            admin = CoreUser.objects.filter(is_superuser=True).first()  # Global Admin
+            admin = CoreUser.objects.filter(is_superuser=True)  # Global Admin
         else:
             org_admin_groups = CoreGroup.objects.filter(permissions=PERMISSIONS_ORG_ADMIN, is_org_level=True)
             admin = CoreUser.objects.filter(core_groups__in=org_admin_groups,
-                                            organization=organization).first()  # Organization Admin
+                                            organization=organization)  # Organization Admin
         if admin:
-            send_email(admin.email, subject, context, template_name, html_template_name)
+            for users in admin:
+                send_email(users.email, subject, context, template_name, html_template_name)
 
         # add org admin role to the user if org is new
         if is_new_org:
