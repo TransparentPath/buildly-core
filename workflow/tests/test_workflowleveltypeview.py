@@ -5,7 +5,7 @@ import factories
 
 from workflow.models import WorkflowLevelType
 from ..views import WorkflowLevelTypeViewSet
-
+from core.tests.fixtures import org_member, org
 
 @pytest.mark.django_db()
 def test_list_workflowleveltype(request_factory, org_member):

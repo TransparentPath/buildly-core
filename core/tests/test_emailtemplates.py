@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db.utils import IntegrityError
 
 from core.models import EmailTemplate, TEMPLATE_RESET_PASSWORD
-
+from core.tests.fixtures import org
 
 @pytest.mark.django_db()
 class TestEmailTemplateModel:

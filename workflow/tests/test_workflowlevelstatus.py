@@ -5,7 +5,7 @@ import factories
 
 from workflow.models import WorkflowLevelStatus
 from ..views import WorkflowLevelStatusViewSet
-
+from core.tests.fixtures import org_member, org
 
 @pytest.mark.django_db()
 def test_list_workflowlevelstatus(request_factory, org_member):
