@@ -8,7 +8,6 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APIClient
 
 from core.views.logicmodule import LogicModuleViewSet
-from core.tests.fixtures import logic_module, superuser
 
 from gateway import utils
 

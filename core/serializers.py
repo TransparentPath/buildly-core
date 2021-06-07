@@ -139,22 +139,22 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         coreuser.save()
 
         # Triggers an approval email for newly registered user
-        approval_link = urljoin(settings.FRONTEND_URL,'/app/profile/users/current-users')
+        approval_link = urljoin(settings.FRONTEND_URL, '/app/profile/users/current-users')
         subject = 'Approval Request'
         template_name = 'email/coreuser/approval.txt'
         html_template_name = 'email/coreuser/approval.html'
         context = {
                     'approval_link': approval_link,
-                    'coreuser_name': coreuser.first_name + ' '+ coreuser.last_name,
+                    'coreuser_name': coreuser.first_name + ' ' + coreuser.last_name,
                     'organization_name': organization
         }
         if is_new_org:
-            admin = CoreUser.objects.filter(is_superuser=True).first() # Global Admin
+            admin = CoreUser.objects.filter(is_superuser=True).first()  # Global Admin
         else:
             org_admin_groups = CoreGroup.objects.filter(permissions=PERMISSIONS_ORG_ADMIN, is_org_level=True)
-            admin = CoreUser.objects.filter(core_groups__in=org_admin_groups, organization=organization).first() # Organization Admin
+            admin = CoreUser.objects.filter(core_groups__in=org_admin_groups,
+                                            organization=organization).first()  # Organization Admin
         send_email(admin.email, subject, context, template_name, html_template_name)
-
 
         # add org admin role to the user if org is new
         if is_new_org:
@@ -168,6 +168,7 @@ class CoreUserWritableSerializer(CoreUserSerializer):
             coreuser.core_groups.add(group)
 
         return coreuser
+
 
 class CoreUserProfileSerializer(serializers.Serializer):
     """ Let's user update his first_name,last_name,title,contact_info,

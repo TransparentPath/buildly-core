@@ -6,16 +6,7 @@ from rest_framework.reverse import reverse
 
 import factories
 from datamesh import views
-from core.tests.fixtures import org, org_admin, org_member, TEST_USER_DATA
-from .fixtures import (
-    document_logic_module,
-    crm_logic_module,
-    document_logic_module_model,
-    appointment_logic_module_model,
-    join_record,
-    relationship,
-    relationship2
-)
+from core.tests.fixtures import TEST_USER_DATA
 
 
 @pytest.mark.django_db()

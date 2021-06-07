@@ -5,8 +5,6 @@ from unittest.mock import patch
 import pytest
 
 import factories
-from core.tests.fixtures import auth_api_client, logic_module
-from .fixtures import datamesh
 from .utils import AiohttpResponseMock, create_aiohttp_session_mock
 
 

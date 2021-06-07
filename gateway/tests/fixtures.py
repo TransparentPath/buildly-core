@@ -2,7 +2,6 @@ import pytest
 
 import factories
 
-from core.tests.fixtures import logic_module
 from gateway.aggregator import SwaggerAggregator
 
 

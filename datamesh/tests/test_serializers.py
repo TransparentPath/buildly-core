@@ -1,7 +1,6 @@
 import pytest
 
 from datamesh.serializers import JoinRecordSerializer
-from .fixtures import join_record
 
 
 @pytest.mark.django_db()
