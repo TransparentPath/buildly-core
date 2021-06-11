@@ -81,19 +81,19 @@ class OrganizationTypeViewSet(viewsets.ModelViewSet):
     Only admin has access to organization type.
 
     retrieve:
-    Return the Consortium.
+    Return the  Organization Type.
 
     list:
-    Return a list of all the existing Consortiums.
+    Return a list of all the existing  Organization Types.
 
     create:
-    Create a new Consortium instance.
+    Create a new Organization Type instance.
 
     update:
-    Update a Consortium instance.
+    Update a Organization Type instance.
 
     delete:
-    Delete a Consortium instance.
+    Delete a Organization Type instance.
     """
 
     filter_fields = ('name',)
