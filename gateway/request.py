@@ -234,6 +234,10 @@ class AsyncGatewayRequest(BaseGatewayRequest):
         tasks = []
         for service in datamesh.related_logic_modules:
             tasks.append(self._get_swagger_spec(service))
+        # Code executes perfectaly upto this point
+        # After that it gives key error
+        # Output of task as given when I tested on local for shipment and custodian
+        #[<coroutine object AsyncGatewayRequest._get_swagger_spec at 0x7f61f6c31dd0>, <coroutine object AsyncGatewayRequest._get_swagger_spec at 0x7f61f6c317a0>]
         specs = await asyncio.gather(*tasks)
         clients = map(lambda x: AsyncSwaggerClient(x, self.request), specs)
         client_map = dict(zip(datamesh.related_logic_modules, clients))
