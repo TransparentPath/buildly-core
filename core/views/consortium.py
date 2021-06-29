@@ -2,13 +2,12 @@ import logging
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import viewsets
-from rest_framework.response import Response
-from rest_framework.decorators import action
 from core.models import Consortium
 from core.serializers import ConsortiumSerializer
 from core.permissions import AllowAuthenticatedRead
 
 logger = logging.getLogger(__name__)
+
 
 class ConsortiumViewSet(viewsets.ModelViewSet):
     """

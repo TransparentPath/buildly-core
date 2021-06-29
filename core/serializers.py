@@ -350,12 +350,14 @@ class CoreUserEmailAlertSerializer(serializers.Serializer):
     messages = serializers.JSONField()
     subject_line = serializers.CharField(max_length=255)
 
+
 class OrganizationTypeSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField()
 
     class Meta:
         model = OrganizationType
         fields = '__all__'
+
 
 class ConsortiumSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source='consortium_uuid', read_only=True)
