@@ -70,3 +70,34 @@ def create_relationship_model(origin_model,related_model):
                     json=payload,
                     headers={'Authorization': 'Bearer ' + settings.CORE_AUTH_TOKEN},
                 )
+
+def join_record_payload(service_name,model_name,related_service_name,related_model_name,record_id_or_uuid,related_record_id_or_uuid):
+    # model name should be as "shipmentShipment", where "shipment" is service and "Shipment" is model name
+    # Join can be on base of id or uuid, so different payload for both
+    if isinstance(record_id_or_uuid,int) and isinstance(related_record_id_or_uuid,int):
+        record_payload = {
+                                "origin_model_name": service_name.lower()+model_name,
+                                "related_model_name": related_service_name.lower()+related_model_name,
+                                "record_id": record_id_or_uuid,
+                                "related_record_id": record_id_or_uuid
+                              }
+    else:
+        record_payload = {
+                                "origin_model_name": service_name.lower()+model_name,
+                                "related_model_name": related_service_name.lower()+related_model_name,
+                                "record_uuid": record_id_or_uuid,
+                                "related_record_uuid": record_id_or_uuid
+                              }
+    return record_payload
+                
+def create_join_records(service_name,model_name,related_service_name,related_model_name,record_id_or_uuid,related_record_id_or_uuid):
+    # It create join record. Input module should be already registered on datamesh logic module model
+    # It also create relationship if relationship of model is not present 
+    payload=join_record_payload(service_name,model_name,related_service_name,related_model_name,record_id_or_uuid,related_record_id_or_uuid)
+    join_records = requests.post(
+                    datamesh_join_url,
+                    json=payload,
+                    headers={'Authorization': 'Bearer ' + settings.CORE_AUTH_TOKEN},
+                )
+#create_relationship_model('custody','item')
+#create_join_records("custodian","Custodian","shipment","Shipment",1,2)
