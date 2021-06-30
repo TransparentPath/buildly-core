@@ -7,37 +7,54 @@ datamesh_relationships_url = (settings.DATAMESH_URL + 'relationships/')
 datamesh_join_url = (settings.DATAMESH_URL + 'joinrecords/')
 
 
-def payload_model(model):
+model_url_endpoint = {'item': '/item/', 'product': '/product/', 'shipment': '/shipment/',
+                      'producttype': '/product_type/', 'itemtype': '/item_type/',
+                      'unitofmeasure': '/unit_of_measure/',
+                      'gateway': '/gateway', 'sensor': '/sensors', 'sensorreport': '/sensor_report/',
+                      'qrcode': '/qrcode/', 'aggregatereport': '/aggregate_report/',
+                      'sensortype': '/sensor_type/', 'gatewaytype': '/gateway_type/',
+                      'sensorreportalert': '/sensor_report_alert/',
+                      'certification': '/certification/', 'custodiantype': '/custodian_type/',
+                      'certificationtype': '/certification_type/', 'customeraccount': '/customer_account/',
+                      'subscriptiontype': '/subscription_type/', 'custody': 'Custody', 'custodian': 'Custodian'
+                      }
+
+
+def payload_model(service_name, model):
     # create a paylaod for post request of logic module model
-    endpoint = model.lower()  # Convert input string for model name into lower case
+    # model_name = model.lower()  # Convert input string for model name into lower case
+    endpoint = model_url_endpoint.get(model.lower())
     payload = {
-            "logic_module_endpoint_name": endpoint,
+            "logic_module_endpoint_name": service_name,
             "model": str(model),
-            "endpoint": "/"+str(endpoint)+"/",
+            # "endpoint": "/"+str(endpoint)+"/",
+            "endpoint": endpoint,
             "lookup_field_name": "id",
             "is_local": False
         }
     return payload
 
 
-logic_module_model = {'item': 'Item', 'product': 'Product', 'shipment': 'Shipment',
-                      'gateway': ' Gateway', 'sensor': 'Sensor', 'sensorreport': 'SensorReport',
-                      'qrcode': 'QRCode', 'aggregatereport': 'AggregateReport',
-                      'sensorreportalert': 'SensorReportAlert', 'certification': 'Certification',
-                      'custody': 'Custody', 'custodian': 'Custodian'}
+logic_module_model = {'shipment': ['Item', 'Product', 'Shipment', 'ProductType', 'ItemType', 'UnitOfMeasure'],
+                      'sensors': ['Gateway', 'Sensor', 'SensorReport', 'QRCode',
+                                  'AggregateReport', 'SensorReportAlert', 'SensorType', 'GatewayType'],
+                      'custodian': ['Certification', 'Custody', 'Custodian', 'Contact', 'CustodianType',
+                                    'CertificationType', 'CustomerAccount', 'SubscriptionType']
+                      }
 
 
 def create_module_model():
     # It will create logic module model for model defined in logic_module_model dict object
     # If logic module model for that service already present, It will not create for the same.
-    for module_model in logic_module_model.values():
+    for service_name, module_models in logic_module_model.items():
         # Create a payload for logic module model
-        payload = payload_model(module_model)
-        # Send a post request with payload to create logic module  model
-        requests.post(datamesh_module_url,
-                      json=payload,
-                      headers={'Authorization': 'Bearer ' + settings.CORE_AUTH_TOKEN},
-                      )
+        for model in module_models:
+            payload = payload_model(service_name, model)
+            # Send a post request with payload to create logic module  model
+            requests.post(datamesh_module_url,
+                          json=payload,
+                          headers={'Authorization': 'Bearer ' + settings.CORE_AUTH_TOKEN},
+                          )
 
 
 def module_model_uuid():
@@ -106,5 +123,9 @@ def create_join_records(service_name, model_name,
                   json=payload,
                   headers={'Authorization': 'Bearer ' + settings.CORE_AUTH_TOKEN},
                   )
+# To create logic model
+# create_module_model()
+# To create relationship
 # create_relationship_model('custody','item')
+# Tp create join, it will create relationship as well if its not present
 # create_join_records("custodian","Custodian","shipment","Shipment",1,2)
