@@ -10,13 +10,13 @@ datamesh_join_url = (settings.DATAMESH_URL + 'joinrecords/')
 model_url_endpoint = {'item': '/item/', 'product': '/product/', 'shipment': '/shipment/',
                       'producttype': '/product_type/', 'itemtype': '/item_type/',
                       'unitofmeasure': '/unit_of_measure/',
-                      'gateway': '/gateway', 'sensor': '/sensors', 'sensorreport': '/sensor_report/',
+                      'gateway': '/gateway', 'sensor': '/sensor/', 'sensorreport': '/sensor_report/',
                       'qrcode': '/qrcode/', 'aggregatereport': '/aggregate_report/',
                       'sensortype': '/sensor_type/', 'gatewaytype': '/gateway_type/',
                       'sensorreportalert': '/sensor_report_alert/',
                       'certification': '/certification/', 'custodiantype': '/custodian_type/',
                       'certificationtype': '/certification_type/', 'customeraccount': '/customer_account/',
-                      'subscriptiontype': '/subscription_type/', 'custody': 'Custody', 'custodian': 'Custodian'
+                      'subscriptiontype': '/subscription_type/', 'custody': '/Custody/', 'custodian': '/Custodian/'
                       }
 
 
