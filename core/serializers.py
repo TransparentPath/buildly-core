@@ -99,7 +99,8 @@ class CoreUserSerializer(serializers.ModelSerializer):
         model = CoreUser
         fields = ('id', 'core_user_uuid', 'first_name', 'last_name', 'email', 'username', 'is_active',
                   'title', 'contact_info', 'privacy_disclaimer_accepted',
-                  'organization', 'core_groups', 'invitation_token', 'email_preferences','push_preferences','user_timezone')
+                  'organization', 'core_groups', 'invitation_token', 'email_preferences',
+                  'push_preferences', 'user_timezone')
         read_only_fields = ('core_user_uuid', 'organization',)
         depth = 1
 
@@ -189,7 +190,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
     class Meta:
         model = CoreUser
         fields = ('first_name', 'last_name', 'password', 'title',
-                  'contact_info', 'organization_name', 'email_preferences','push_preferences','user_timezone')
+                  'contact_info', 'organization_name', 'email_preferences', 'push_preferences', 'user_timezone')
 
     def update(self, instance, validated_data):
 
