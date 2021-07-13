@@ -307,9 +307,11 @@ class CoreUserViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
                 core_users = CoreUser.objects.filter(organization__organization_uuid=org_uuid)
                 for user in core_users:
                     email_address = user.email
-                    local_zone = tz.gettz(user.user_timezone)
-                    message['date_time'] = message['date_time'].astimezone(local_zone)
-                    send_email(email_address, subject, context, template_name, html_template_name)
+                    preferences = user.email_preferences
+                    if preferences and (preferences.get('environmental',None) or preferences.get('geofence',None)):
+                        local_zone = tz.gettz(user.user_timezone)
+                        message['date_time'] = message['date_time'].astimezone(local_zone)
+                        send_email(email_address, subject, context, template_name, html_template_name)
         except Exception as ex:
             print('Exception: ',ex)
         return Response(
