@@ -77,6 +77,8 @@ services:
       EMAIL_BACKEND: "SMTP"
       DEFAULT_FROM_EMAIL: "admin@buildly.io"
       RESETPASS_CONFIRM_URL_PATH: "reset-password-confirm/"
+      DATAMESH_URL: "https://tp-dev-api.buildly.io/datamesh/"
+      CORE_AUTH_TOKEN: "4wbNpKML8QFLLbLTsuUAMKcaK6YwjU"
 #      LDAP_ENABLE: "True"
 #      LDAP_HOST: "ldap://openldap_server:389"
 #      LDAP_USERNAME: "cn=admin,dc=example,dc=org"
