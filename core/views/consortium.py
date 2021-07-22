@@ -36,6 +36,7 @@ class ConsortiumViewSet(viewsets.ModelViewSet):
     Delete a Consortium instance.
     """
     permission_classes_by_action = {'list': [AllowAuthenticatedRead]}
+
     def list(self, request):
         queryset = self.filter_queryset(self.get_queryset())
         organization_uuid = self.request.query_params.get('organization_uuid', None)
