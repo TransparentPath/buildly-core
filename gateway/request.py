@@ -104,20 +104,21 @@ class GatewayRequest(BaseGatewayRequest):
             except exceptions.ServiceDoesNotExist as e:
                 logger.error(e.content)
 
-        path_url=self.request.path  # Get request path
-        list_string_path=path_url.split("/") # Split the request path to check if custody include in it
-        if 'join' not in self.request.query_params and 'custody' in list_string_path and status_code == 201 and type(content) in [dict, list] and self.request.method=='POST':
+        path_url = self.request.path  # Get request path
+        list_string_path = path_url.split("/")  # Split the request path to check if custody include in it
+        if ('join' not in self.request.query_params and 'custody' in list_string_path and
+                status_code == 201 and type(content) in [dict, list] and self.request.method == 'POST'):
             # This functionality will execute only when request include custody with post request,
             # It will not execute if its join request
             related_organization = content.get('organization_uuid')
-            shipment_name=content.get('shipment')
+            shipment_name = content.get('shipment')
             # Check if consortium already present for respective shipment
             consortium = Consortium.objects.filter(name=shipment_name).first()
             if consortium:
                 # if consortium exist,update consortium for organization uuid
-                organization_list=consortium.organization_uuids
+                organization_list = consortium.organization_uuids
                 import uuid
-                org_uuid=uuid.UUID(related_organization)
+                org_uuid = uuid.UUID(related_organization)
                 if org_uuid not in organization_list:
                     # To avoid repeated organization uuid adding in consortium organization uuid
                     organization_list.append(related_organization)
@@ -125,8 +126,8 @@ class GatewayRequest(BaseGatewayRequest):
                     consortium.save()
             else:
                 # If consortium does not exists for shipment name, then create consortium
-                Consortium.objects.create(name=shipment_name,organization_uuids=[related_organization])
-                
+                Consortium.objects.create(name=shipment_name, organization_uuids=[related_organization])
+
         if type(content) in [dict, list]:
             content = json.dumps(content, cls=utils.GatewayJSONEncoder)
 
