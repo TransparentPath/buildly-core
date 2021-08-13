@@ -35,7 +35,7 @@ def custody_shipment_relationship():
 
     # get or create datamesh Logic Module Model
     # add lookup field as id or uuid
-    origin_model, _ = LogicModuleModel.objects.get_or_create(
+    related_model, _ = LogicModuleModel.objects.get_or_create(
         model='Shipment',
         logic_module_endpoint_name=origin_logic_module.endpoint_name,
         endpoint='/shipment/',
@@ -44,7 +44,7 @@ def custody_shipment_relationship():
 
     # get or create datamesh Logic Module Model
     # add lookup field as id or uuid
-    related_model, _ = LogicModuleModel.objects.get_or_create(
+    origin_model, _ = LogicModuleModel.objects.get_or_create(
         model='Custody',
         logic_module_endpoint_name=related_logic_module.endpoint_name,
         endpoint='/custody/',
@@ -75,8 +75,8 @@ def custody_shipment_relationship():
         # create join record
         join_record, _ = JoinRecord.objects.get_or_create(
             relationship=relationship,
-            record_uuid=shipment_uuid,
-            related_record_id=data['pk'],
+            record_id=data['pk'],
+            related_record_uuid=shipment_uuid,
             defaults={'organization': None}
         )
         print(join_record)
