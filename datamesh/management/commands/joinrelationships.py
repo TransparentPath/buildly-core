@@ -1,9 +1,7 @@
 from django.core.management.base import BaseCommand
-import re
-from django.db import IntegrityError
 import json
 from datamesh.models import JoinRecord, Relationship, LogicModuleModel
-from core.models import LogicModule, Organization
+from core.models import LogicModule
 
 
 class Command(BaseCommand):
