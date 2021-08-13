@@ -10,7 +10,6 @@ from rest_framework.request import Request
 from rest_framework.authentication import get_authorization_header
 
 from . import exceptions
-from . import utils
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ class BaseSwaggerClient:
             # It was checking shipment/{uuid} in API specification when pk is of uuid type,
             # as TP services are mainly using
             # shipment/{id}
-            # Commenting code to make it work for id, as TP services don't have endpoint to 
+            # Commenting code to make it work for id, as TP services don't have endpoint to
             # make request by uuid
             # pk_name = 'uuid' if utils.valid_uuid4(pk) else 'id'
             pk_name = 'id'
