@@ -2,9 +2,10 @@ from django.core.management.base import BaseCommand
 import json
 from datamesh.models import JoinRecord, Relationship, LogicModuleModel
 from core.models import LogicModule
-from .gateway import gateway_custodian_relationship
-from .shipment import shipment_gateway_relationship , consortium_shipment_relationship , shipment_item_relationship
-from .custody import custody_shipment_relationship
+from .gateway import gateway_custodian_relationship, organization_gateway_relationship
+from .shipment import shipment_gateway_relationship, consortium_shipment_relationship, shipment_item_relationship, \
+    organization_shipment_relationship
+from .custody import custody_shipment_relationship, custodian_custody_relationship
 
 
 class Command(BaseCommand):
@@ -23,17 +24,15 @@ def run_seed(self, mode):
     """call function here."""
 
     """custody"""
-    # custody shipment relationship
-    custody_shipment_relationship()
+    # custody_shipment_relationship()
+    # custodian_custody_relationship()
 
     """gateway"""
-    # gateway_custodian_relationship
-    gateway_custodian_relationship()
+    # gateway_custodian_relationship()
+    # organization_gateway_relationship()
 
     """shipment"""
-    # custody_shipment_relationship
-    shipment_gateway_relationship()
+    # shipment_gateway_relationship()
     consortium_shipment_relationship()
-    shipment_item_relationship()
-
-
+    # shipment_item_relationship()
+    # organization_shipment_relationship()
