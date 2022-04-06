@@ -316,7 +316,7 @@ class CoreUserViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
                             local_zone = tz.gettz(user_timezone)
                             message['date_time'] = message['date_time'].astimezone(local_zone)
                         else:
-                            message['date_time'] = time_tuple.strftime("%B %d, %Y, %I:%M %p")
+                            message['date_time'] = time_tuple.strftime("%B %d, %Y, %I:%M %p")+" (UTC)"
                         send_email(email_address, subject, context, template_name, html_template_name)
         except Exception as ex:
             print('Exception: ', ex)
