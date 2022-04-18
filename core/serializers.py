@@ -307,7 +307,7 @@ class CoreUserResetPasswordConfirmSerializer(CoreUserResetPasswordCheckSerialize
         return self.user
 
 
-class OrganizationSerializer(serializers.ModelSerializer):
+class OrganizationSerializer(serializers.HyperlinkedModelSerializer):
     id = serializers.UUIDField(source='organization_uuid', read_only=True)
 
     class Meta:
