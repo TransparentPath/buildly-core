@@ -1,4 +1,4 @@
-name: Sensor Service Unit Test
+name: Buildly Core Unit Test
 
 on:
   pull_request:
