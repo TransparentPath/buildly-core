@@ -1,4 +1,7 @@
+import datetime
+import json
 import jwt
+import requests
 import secrets
 
 from urllib.parse import urljoin
@@ -152,10 +155,18 @@ class CoreUserWritableSerializer(CoreUserSerializer):
     core_groups = serializers.PrimaryKeyRelatedField(
         many=True, queryset=CoreGroup.objects.all(), required=False
     )
+    country = serializers.CharField(required=False)
+    currency = serializers.CharField(required=False)
+    date_format = serializers.CharField(required=False)
+    time_format = serializers.CharField(required=False)
+    distance = serializers.CharField(required=False)
+    temperature = serializers.CharField(required=False)
+    weight = serializers.CharField(required=False)
 
     class Meta:
         model = CoreUser
-        fields = CoreUserSerializer.Meta.fields + ('password', 'organization_name')
+        fields = CoreUserSerializer.Meta.fields + ('password', 'organization_name', 'country', 'currency', 'date_format',
+                                                   'time_format', 'distance', 'temperature', 'weight')
         read_only_fields = CoreUserSerializer.Meta.read_only_fields
 
     def create(self, validated_data):
@@ -167,6 +178,13 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         organization, is_new_org = Organization.objects.get_or_create(**organization)
 
         core_groups = validated_data.pop('core_groups', [])
+        country = validated_data.pop('country', '')
+        currency = validated_data.pop('currency', '')
+        date_format = validated_data.pop('date_format', '')
+        time_format = validated_data.pop('time_format', '')
+        distance = validated_data.pop('distance', '')
+        temperature = validated_data.pop('temperature', '')
+        weight = validated_data.pop('weight', '')
 
         # create core user
         invitation_token = validated_data.pop('invitation_token', None)
@@ -215,6 +233,44 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         # add requested groups to the user
         for group in core_groups:
             coreuser.core_groups.add(group)
+
+        # create unit of measurements for the new organization
+        if is_new_org:
+            uom_url = settings.TP_SHIPMENT_URL + 'unit_of_measure/'
+            data = {
+                'organization_uuid': str(organization.organization_uuid),
+                'create_date': datetime.datetime.today().isoformat(),
+                'edit_date': datetime.datetime.today().isoformat(),
+            }
+
+            if country:
+                country_data = json.dumps({**data, 'unit_of_measure_for': 'Country', 'unit_of_measure': country})
+                requests.post(uom_url, data=country_data).json()
+
+            if currency:
+                currency_data = json.dumps({**data, 'unit_of_measure_for': 'Currency', 'unit_of_measure': currency})
+                requests.post(uom_url, data=currency_data).json()
+
+            if date_format:
+                date_format_data = json.dumps({**data, 'unit_of_measure_for': 'Date', 'unit_of_measure': date_format})
+                requests.post(uom_url, data=date_format_data).json()
+
+            if time_format:
+                time_format_data = json.dumps({**data, 'unit_of_measure_for': 'Time', 'unit_of_measure': time_format})
+                requests.post(uom_url, data=time_format_data).json()
+
+            if distance:
+                distance_data = json.dumps({**data, 'unit_of_measure_for': 'Distance', 'unit_of_measure': distance})
+                requests.post(uom_url, data=distance_data).json()
+
+            if temperature:
+                temperature_data = json.dumps({**data, 'unit_of_measure_for': 'Temperature', 'unit_of_measure': temperature})
+                requests.post(uom_url, data=temperature_data).json()
+
+            if weight:
+                weight_data = json.dumps({**data, 'unit_of_measure_for': 'Weight', 'unit_of_measure': weight})
+                requests.post(uom_url, data=weight_data).json()
+
 
         return coreuser
 
