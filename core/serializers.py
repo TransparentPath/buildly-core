@@ -1,5 +1,4 @@
 import datetime
-import json
 import jwt
 import requests
 import secrets
@@ -244,31 +243,31 @@ class CoreUserWritableSerializer(CoreUserSerializer):
             }
 
             if country:
-                country_data = json.dumps({**data, 'unit_of_measure_for': 'Country', 'unit_of_measure': country})
+                country_data = {**data, 'unit_of_measure_for': 'Country', 'unit_of_measure': country}
                 requests.post(uom_url, data=country_data).json()
 
             if currency:
-                currency_data = json.dumps({**data, 'unit_of_measure_for': 'Currency', 'unit_of_measure': currency})
+                currency_data = {**data, 'unit_of_measure_for': 'Currency', 'unit_of_measure': currency}
                 requests.post(uom_url, data=currency_data).json()
 
             if date_format:
-                date_format_data = json.dumps({**data, 'unit_of_measure_for': 'Date', 'unit_of_measure': date_format})
+                date_format_data = {**data, 'unit_of_measure_for': 'Date', 'unit_of_measure': date_format}
                 requests.post(uom_url, data=date_format_data).json()
 
             if time_format:
-                time_format_data = json.dumps({**data, 'unit_of_measure_for': 'Time', 'unit_of_measure': time_format})
+                time_format_data = {**data, 'unit_of_measure_for': 'Time', 'unit_of_measure': time_format}
                 requests.post(uom_url, data=time_format_data).json()
 
             if distance:
-                distance_data = json.dumps({**data, 'unit_of_measure_for': 'Distance', 'unit_of_measure': distance})
+                distance_data = {**data, 'unit_of_measure_for': 'Distance', 'unit_of_measure': distance}
                 requests.post(uom_url, data=distance_data).json()
 
             if temperature:
-                temperature_data = json.dumps({**data, 'unit_of_measure_for': 'Temperature', 'unit_of_measure': temperature})
+                temperature_data = {**data, 'unit_of_measure_for': 'Temperature', 'unit_of_measure': temperature}
                 requests.post(uom_url, data=temperature_data).json()
 
             if weight:
-                weight_data = json.dumps({**data, 'unit_of_measure_for': 'Weight', 'unit_of_measure': weight})
+                weight_data = {**data, 'unit_of_measure_for': 'Weight', 'unit_of_measure': weight}
                 requests.post(uom_url, data=weight_data).json()
 
 
