@@ -161,11 +161,12 @@ class CoreUserWritableSerializer(CoreUserSerializer):
     distance = serializers.CharField(required=False)
     temperature = serializers.CharField(required=False)
     weight = serializers.CharField(required=False)
+    organization_abbrevation = serializers.CharField(source='organization.abbrevation', required=False)
 
     class Meta:
         model = CoreUser
         fields = CoreUserSerializer.Meta.fields + ('password', 'organization_name', 'country', 'currency', 'date_format',
-                                                   'time_format', 'distance', 'temperature', 'weight')
+                                                   'time_format', 'distance', 'temperature', 'weight', 'organization_abbrevation')
         read_only_fields = CoreUserSerializer.Meta.read_only_fields
 
     def create(self, validated_data):
