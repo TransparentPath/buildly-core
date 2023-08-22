@@ -64,7 +64,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         Any logged in user can access this
         """
         # returns names of existing orgs in Buildly Core as a list
-        queryset = Organization.objects.all()
+        queryset = Organization.objects.all().exclude(organization_type=1)
         names = list()
         for record in queryset:
             names.append(record.name)
