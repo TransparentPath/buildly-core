@@ -34,8 +34,8 @@ from core.jwt_utils import create_invitation_token
 from core.email_utils import send_email
 import logging
 
-# from datetime import datetime
-# from dateutil import tz
+from datetime import datetime
+from pytz import timezone
 # from twilio.rest import Client
 logger = logging.getLogger(__name__)
 
@@ -321,23 +321,13 @@ class CoreUserViewSet(
         messages = request.data['messages']
         try:
             for message in messages:
-                # try:
-                #     time_tuple = datetime.strptime(message['date_time'], "%Y-%m-%dT%H:%M:%S%z")
-                # except ValueError:
-                #     time_tuple = datetime.strptime(message['date_time'], "%Y-%m-%dT%H:%M:%S.%f%z")
-                # message['date_time'] = time_tuple.replace(tzinfo=tz.gettz('UTC'))
-                subject = '{} Alert'.format(message['parameter'].capitalize())
-                if message.get('shipment_id'):
-                    message['shipment_url'] = urljoin(
-                        settings.FRONTEND_URL,
-                        '/app/shipment/edit/:' + str(message['shipment_id']),
-                    )
-                else:
-                    message['shipment_url'] = None
+                subject = message['header']
                 message['color'] = color_codes.get(message['severity'])
                 context = {'message': message}
+                alert_time = datetime.strptime(message['alert_time'], "%Y-%m-%dT%H:%M:%S.%f%z")
                 template_name = 'email/coreuser/shipment_alert.txt'
                 html_template_name = 'email/coreuser/shipment_alert.html'
+
                 # TODO send email via preferences
                 core_users = CoreUser.objects.filter(
                     organization__organization_uuid=org_uuid
@@ -349,12 +339,11 @@ class CoreUserViewSet(
                         preferences.get('environmental', None)
                         or preferences.get('geofence', None)
                     ):
-                        # user_timezone = user.user_timezone
-                        # if user_timezone:
-                        #     local_zone = tz.gettz(user_timezone)
-                        #     message['date_time'] = message['date_time'].astimezone(local_zone)
-                        # else:
-                        #     message['date_time'] = time_tuple.strftime("%B %d, %Y, %I:%M %p")+" (UTC)"
+                        user_timezone = user.user_timezone
+                        if user_timezone:
+                            message['alert_message'] = message['alert_message'] + alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                        else:
+                            message['alert_message'] = message['alert_message'] + alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
                         send_email(
                             email_address,
                             subject,
@@ -394,4 +383,4 @@ class CoreUserViewSet(
         return Response(serializer.data)
 
 
-color_codes = {'error': '#cc3300', 'info': '#2196F3', 'success': '#339900'}
+color_codes = {'error': '#FF0033', 'info': '#0099CC', 'success': '#009900'}
