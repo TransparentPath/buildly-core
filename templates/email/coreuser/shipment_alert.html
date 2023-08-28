@@ -33,34 +33,74 @@
 					<td style="width: 691px; height: 150px">
 						<div>
 							<p>{{message.body_text}}</p>
-							<p><strong>Shipment: </strong>{{ message.shipment_name }}</p>
+							<p>
+								<strong>Shipment: </strong>
+								<a href="{{message.shipment_url}}">
+									<span style="color:{{ message.color }}">
+										{{ message.shipment_name }}
+									</span>
+								</a>
+							</p>
 
-							{% if message.severity == 'error' %}
-								<p><strong>ISSUE: </strong>{{ message.alert_message }}</p>
-							{% elif message.severity == 'info' %}
-							<p><strong>ISSUE: </strong>{{ message.alert_message }}</p>
+							{% if message.severity in ['error', 'info'] %}
+								<p>
+									<strong>ISSUE: </strong>
+									<span style="color:{{ message.color }}">
+										{{ message.alert_message }}{{ message.local_time }}
+									</span>
+								</p>
 							{% elif message.severity == 'success' %}
-								<p><strong>RESOLUTION: </strong>{{ message.alert_message }}</p>
+								<p>
+									<strong>RESOLUTION: </strong>
+									<span style="color:{{ message.color }}">
+										{{ message.alert_message }}{{ message.local_time }}
+									</span>
+								</p>
 							{% endif %}
 
-							{% if message.severity == 'error' %}
-								<p><strong>ISSUE LOCATION: </strong><a href="{{message.location}}"><span>Click here</span></a></p>
-							{% elif message.severity == 'info' %}
-								<p><strong>ISSUE LOCATION: </strong><a href="{{message.location}}"><span>Click here</span></a></p>
+							{% if message.severity in ['error', 'info'] %}
+								<p>
+									<strong>ISSUE LOCATION: </strong>
+									<a href="{{message.location}}">
+										<span style="color:{{ message.color }}">Click here</span>
+									</a>
+								</p>
 							{% elif message.severity == 'success' %}
-								<p><strong>RESOLUTION LOCATION: </strong><a href="{{message.location}}"><span>Click here</span></a></p>
+								<p>
+									<strong>RESOLUTION LOCATION: </strong>
+									<a href="{{message.location}}">
+										<span style="color:{{ message.color }}">Click here</span>
+									</a>
+								</p>
 							{% endif %}
 
-							{% if message.severity == 'error' %}
-								<p><strong>ITEMS IN JEOPARDY: </strong>{{ message.items }}</p>
-							{% elif message.severity == 'info' %}
-								<p><strong>ITEMS IN JEOPARDY: </strong>{{ message.items }}</p>
+							{% if message.severity in ['error', 'info'] %}
+								<p>
+									<strong>ITEMS IN JEOPARDY: </strong>
+									<span style="color:{{ message.color }}">
+										{{ message.items }}
+									</span>
+								</p>
 							{% elif message.severity == 'success' %}
-								<p><strong>ITEMS RECOVERED: </strong>{{ message.items }}</p>
+								<p>
+									<strong>ITEMS RECOVERED: </strong>
+									<span style="color:{{ message.color }}">
+										{{ message.items }}
+									</span>
+								</p>
 							{% endif %}
 
-							<p><strong>SHIPMENT VALUE: </strong>{{ message.shipment_value }}</p>
-							<p><strong>ACTION: </strong><span style="color:{{ message.color }}">Please verify any product damage or loss as soon as possible.</span></p>
+							<p>
+								<strong>SHIPMENT VALUE: </strong>
+								<span style="color:{{ message.color }}">
+									{{ message.shipment_value }}{{ message.currency }}
+								</span>
+							</p>
+							<p>
+								<strong>ACTION: </strong>
+								<span style="color:{{ message.color }}">
+									Please verify any product damage or loss as soon as possible.
+								</span>
 							</p>
 						</div>
 					</td>

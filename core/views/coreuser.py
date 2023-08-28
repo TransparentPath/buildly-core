@@ -1,3 +1,4 @@
+import requests
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -328,6 +329,19 @@ class CoreUserViewSet(
                 template_name = 'email/coreuser/shipment_alert.txt'
                 html_template_name = 'email/coreuser/shipment_alert.html'
 
+                # Set shipment url
+                message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+
+                # Get Currency default for the organization
+                uom_currency_url = (
+                    settings.TP_SHIPMENT_URL
+                    + 'unit_of_measure/?organization_uuid='
+                    + org_uuid
+                    + '&unit_of_measure_for=Currency'
+                )
+                uom_currency = requests.get(uom_currency_url, headers=settings.BUILDLY_AUTH_HEADER).json()[0]
+                message['currency'] = uom_currency.get('unit_of_measure')
+
                 # TODO send email via preferences
                 core_users = CoreUser.objects.filter(
                     organization__organization_uuid=org_uuid
@@ -341,9 +355,9 @@ class CoreUserViewSet(
                     ):
                         user_timezone = user.user_timezone
                         if user_timezone:
-                            message['alert_message'] = message['alert_message'] + alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                            message['local_time'] = alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
                         else:
-                            message['alert_message'] = message['alert_message'] + alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                            message['local_time'] = alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
                         send_email(
                             email_address,
                             subject,
