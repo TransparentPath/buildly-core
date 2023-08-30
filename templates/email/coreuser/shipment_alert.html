@@ -42,7 +42,14 @@
 								</a>
 							</p>
 
-							{% if message.severity in ['error', 'info'] %}
+							{% if message.severity == 'error' %}
+								<p>
+									<strong>ISSUE: </strong>
+									<span style="color:{{ message.color }}">
+										{{ message.alert_message }}{{ message.local_time }}
+									</span>
+								</p>
+							{% elif message.severity == 'info' %}
 								<p>
 									<strong>ISSUE: </strong>
 									<span style="color:{{ message.color }}">
@@ -58,7 +65,14 @@
 								</p>
 							{% endif %}
 
-							{% if message.severity in ['error', 'info'] %}
+							{% if message.severity == 'error' %}
+								<p>
+									<strong>ISSUE LOCATION: </strong>
+									<a href="{{message.location}}">
+										<span style="color:{{ message.color }}">Click here</span>
+									</a>
+								</p>
+							{% elif message.severity == 'info' %}
 								<p>
 									<strong>ISSUE LOCATION: </strong>
 									<a href="{{message.location}}">
@@ -74,7 +88,14 @@
 								</p>
 							{% endif %}
 
-							{% if message.severity in ['error', 'info'] %}
+							{% if message.severity == 'error' %}
+								<p>
+									<strong>ITEMS IN JEOPARDY: </strong>
+									<span style="color:{{ message.color }}">
+										{{ message.items }}
+									</span>
+								</p>
+							{% elif message.severity == 'info' %}
 								<p>
 									<strong>ITEMS IN JEOPARDY: </strong>
 									<span style="color:{{ message.color }}">
