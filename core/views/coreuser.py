@@ -340,7 +340,7 @@ class CoreUserViewSet(
                     + '&unit_of_measure_for=Currency'
                 )
                 uom_currency = requests.get(uom_currency_url).json()[0]
-                message['currency'] = uom_currency.get('unit_of_measure')
+                message['currency'] = ' ' + uom_currency.get('unit_of_measure')
 
                 # TODO send email via preferences
                 core_users = CoreUser.objects.filter(

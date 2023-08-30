@@ -68,23 +68,17 @@
 							{% if message.severity == 'error' %}
 								<p>
 									<strong>ISSUE LOCATION: </strong>
-									<a href="{{message.location}}">
-										<span style="color:{{ message.color }}">Click here</span>
-									</a>
+									<span style="color:{{ message.color }}">{{ message.location }}</span>
 								</p>
 							{% elif message.severity == 'info' %}
 								<p>
 									<strong>ISSUE LOCATION: </strong>
-									<a href="{{message.location}}">
-										<span style="color:{{ message.color }}">Click here</span>
-									</a>
+									<span style="color:{{ message.color }}">{{ message.location }}</span>
 								</p>
 							{% elif message.severity == 'success' %}
 								<p>
 									<strong>RESOLUTION LOCATION: </strong>
-									<a href="{{message.location}}">
-										<span style="color:{{ message.color }}">Click here</span>
-									</a>
+									<span style="color:{{ message.color }}">{{ message.location }}</span>
 								</p>
 							{% endif %}
 
