@@ -339,7 +339,7 @@ class CoreUserViewSet(
                     + org_uuid
                     + '&unit_of_measure_for=Currency'
                 )
-                uom_currency = requests.get(uom_currency_url, headers=settings.BUILDLY_AUTH_HEADER).json()[0]
+                uom_currency = requests.get(uom_currency_url).json()[0]
                 message['currency'] = uom_currency.get('unit_of_measure')
 
                 # TODO send email via preferences
