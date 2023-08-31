@@ -165,6 +165,7 @@ class Organization(models.Model):
     organization_type = models.ForeignKey(
         OrganizationType, on_delete=models.CASCADE, null=True
     )
+    abbrevation = models.CharField("Organization Abbrevation", max_length=7, blank=True, default="DEFAULT")
 
     class Meta:
         ordering = ('name',)

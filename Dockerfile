@@ -22,7 +22,7 @@ RUN ./scripts/collectstatic.sh
 RUN apk del .build-deps
 
 # Specify tag name to be created on github
-LABEL version="1.1.1"
+LABEL version="1.0.0"
 
 EXPOSE 8080
 ENTRYPOINT ["bash", "/code/scripts/docker-entrypoint.sh"]

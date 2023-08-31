@@ -29,6 +29,7 @@ def test_org_serializer(request_factory, org):
         'allow_import_export',
         'radius',
         'organization_type',
+        'abbrevation',
     ]
     assert set(data.keys()) == set(keys)
 
