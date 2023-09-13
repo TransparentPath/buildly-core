@@ -166,6 +166,18 @@ class Organization(models.Model):
         OrganizationType, on_delete=models.CASCADE, null=True
     )
     abbrevation = models.CharField("Organization Abbrevation", max_length=7, blank=True, default="DEFAULT")
+    default_max_temperature = models.FloatField(max_length=20, blank=True, null=True, default=100.0)
+    default_min_temperature = models.FloatField(max_length=20, blank=True, null=True, default=0.0)
+    default_max_humidity = models.FloatField(max_length=20, blank=True, null=True, default=100.0)
+    default_min_humidity = models.FloatField(max_length=20, blank=True, null=True, default=0.0)
+    default_shock = models.FloatField(max_length=20, blank=True, null=True, default=4.0)
+    default_light = models.FloatField(max_length=20, blank=True, null=True, default=5.0)
+    default_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
+    default_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
+    push_notify_geofence = models.BooleanField('Allow Push Notification for Geofence Alerts', default=True)
+    push_notify_environmental = models.BooleanField('Allow Push Notification for Environmental Alerts', default=True)
+    email_notify_geofence = models.BooleanField('Allow Email Notification for Geofence Alerts', default=True)
+    email_notify_environmental = models.BooleanField('Allow Email Notification for Environmental Alerts', default=True)
 
     class Meta:
         ordering = ('name',)

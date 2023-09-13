@@ -321,50 +321,52 @@ class CoreUserViewSet(
         org_uuid = request.data['organization_uuid']
         messages = request.data['messages']
         try:
-            for message in messages:
-                subject = message['header']
-                message['color'] = color_codes.get(message['severity'])
-                context = {'message': message}
-                alert_time = datetime.strptime(message['alert_time'], "%Y-%m-%dT%H:%M:%S.%f%z")
-                template_name = 'email/coreuser/shipment_alert.txt'
-                html_template_name = 'email/coreuser/shipment_alert.html'
+            organization = Organization.objects.get(organization_uuid=org_uuid)
+            if organization.email_notify_geofence or organization.email_notify_environmental:
+                for message in messages:
+                    subject = message['header']
+                    message['color'] = color_codes.get(message['severity'])
+                    context = {'message': message}
+                    alert_time = datetime.strptime(message['alert_time'], "%Y-%m-%dT%H:%M:%S.%f%z")
+                    template_name = 'email/coreuser/shipment_alert.txt'
+                    html_template_name = 'email/coreuser/shipment_alert.html'
 
-                # Set shipment url
-                message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+                    # Set shipment url
+                    message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
 
-                # Get Currency default for the organization
-                uom_currency_url = (
-                    settings.TP_SHIPMENT_URL
-                    + 'unit_of_measure/?organization_uuid='
-                    + org_uuid
-                    + '&unit_of_measure_for=Currency'
-                )
-                uom_currency = requests.get(uom_currency_url).json()[0]
-                message['currency'] = ' ' + uom_currency.get('unit_of_measure')
+                    # Get Currency default for the organization
+                    uom_currency_url = (
+                        settings.TP_SHIPMENT_URL
+                        + 'unit_of_measure/?organization_uuid='
+                        + org_uuid
+                        + '&unit_of_measure_for=Currency'
+                    )
+                    uom_currency = requests.get(uom_currency_url).json()[0]
+                    message['currency'] = ' ' + uom_currency.get('unit_of_measure')
 
-                # TODO send email via preferences
-                core_users = CoreUser.objects.filter(
-                    organization__organization_uuid=org_uuid
-                )
-                for user in core_users:
-                    email_address = user.email
-                    preferences = user.email_preferences
-                    if preferences and (
-                        preferences.get('environmental', None)
-                        or preferences.get('geofence', None)
-                    ):
-                        user_timezone = user.user_timezone
-                        if user_timezone:
-                            message['local_time'] = alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
-                        else:
-                            message['local_time'] = alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
-                        send_email(
-                            email_address,
-                            subject,
-                            context,
-                            template_name,
-                            html_template_name,
-                        )
+                    # TODO send email via preferences
+                    core_users = CoreUser.objects.filter(
+                        organization__organization_uuid=org_uuid
+                    )
+                    for user in core_users:
+                        email_address = user.email
+                        preferences = user.email_preferences
+                        if preferences and (
+                            preferences.get('environmental', None)
+                            or preferences.get('geofence', None)
+                        ):
+                            user_timezone = user.user_timezone
+                            if user_timezone:
+                                message['local_time'] = alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                            else:
+                                message['local_time'] = alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                            send_email(
+                                email_address,
+                                subject,
+                                context,
+                                template_name,
+                                html_template_name,
+                            )
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
