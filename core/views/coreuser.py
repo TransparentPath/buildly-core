@@ -19,6 +19,7 @@ from core.serializers import (
     CoreUserResetPasswordCheckSerializer,
     CoreUserResetPasswordConfirmSerializer,
     CoreUserEmailAlertSerializer,
+    CoreUserStatusBatteryAlertSerializer,
     CoreUserProfileSerializer,
 )
 
@@ -82,6 +83,8 @@ class CoreUserViewSet(
         'reset_password_check': CoreUserResetPasswordCheckSerializer,
         'reset_password_confirm': CoreUserResetPasswordConfirmSerializer,
         'alert': CoreUserEmailAlertSerializer,
+        'status_alert': CoreUserStatusBatteryAlertSerializer,
+        'battery_alert': CoreUserStatusBatteryAlertSerializer,
     }
 
     def list(self, request, *args, **kwargs):
@@ -385,6 +388,110 @@ class CoreUserViewSet(
         #                     to=phone_number
         #                 )
         #     print(message.sid)
+
+    @swagger_auto_schema(
+        methods=['post'],
+        request_body=CoreUserStatusBatteryAlertSerializer,
+        responses=SUCCESS_RESPONSE,
+    )
+    @action(methods=['POST'], detail=False)
+    def status_alert(self, request, *args, **kwargs):
+        """
+        a)Request alert message and uuid of organization
+        b)Access user uuids for that respective organization
+        c)Check if opted for email alert service
+        d)Send Email to the user's email with alert message
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        org_uuid = request.data['organization_uuid']
+        message = request.data['message']
+        try:
+            subject = message['header']
+            message['color'] = color_codes.get(message['severity'])
+            context = {'message': message}
+            template_name = 'email/coreuser/status_alert.txt'
+            html_template_name = 'email/coreuser/status_alert.html'
+
+            # Set shipment url
+            message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+
+            # TODO send email via preferences
+            core_users = CoreUser.objects.filter(
+                organization__organization_uuid=org_uuid, 
+            )
+            for user in core_users:
+                email_address = user.email
+                preferences = user.email_preferences
+                if preferences and (
+                    preferences.get('environmental', None)
+                    or preferences.get('geofence', None)
+                ):
+                    send_email(
+                        email_address,
+                        subject,
+                        context,
+                        template_name,
+                        html_template_name,
+                    )
+        except Exception as ex:
+            print('Exception: ', ex)
+        return Response(
+            {'detail': 'Battery alert messages were sent successfully on email.'},
+            status=status.HTTP_200_OK,
+        )
+    
+    @swagger_auto_schema(
+        methods=['post'],
+        request_body=CoreUserStatusBatteryAlertSerializer,
+        responses=SUCCESS_RESPONSE,
+    )
+    @action(methods=['POST'], detail=False)
+    def battery_alert(self, request, *args, **kwargs):
+        """
+        a)Request alert message and uuid of organization
+        b)Access user uuids for that respective organization
+        c)Check if opted for email alert service
+        d)Send Email to the user's email with alert message
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        org_uuid = request.data['organization_uuid']
+        message = request.data['message']
+        try:
+            subject = message['header']
+            message['color'] = color_codes.get(message['severity'])
+            context = {'message': message}
+            template_name = 'email/coreuser/battery_alert.txt'
+            html_template_name = 'email/coreuser/battery_alert.html'
+
+            # Set shipment url
+            message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+
+            # TODO send email via preferences
+            core_users = CoreUser.objects.filter(
+                organization__organization_uuid=org_uuid, 
+            )
+            for user in core_users:
+                email_address = user.email
+                preferences = user.email_preferences
+                if preferences and (
+                    preferences.get('environmental', None)
+                    or preferences.get('geofence', None)
+                ):
+                    send_email(
+                        email_address,
+                        subject,
+                        context,
+                        template_name,
+                        html_template_name,
+                    )
+        except Exception as ex:
+            print('Exception: ', ex)
+        return Response(
+            {'detail': 'Status alert messages were sent successfully on email.'},
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=['patch'], name='Update Profile')
     def update_profile(self, request, pk=None, *args, **kwargs):
