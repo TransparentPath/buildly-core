@@ -65,15 +65,11 @@
 							{% elif message.status == 'Completed' %}
 								<p>
 									<strong>ACTION: </strong>
-									<span>Shipment status automatically changes to 'Completed' within 24 hours of arrival. 
+									<span>Shipment status has changed to 'Completed'. 
 										<ul>
 											<li>If this shipment is completed, no further action is needed.</li>
 											<li>
-												If the shipment status needs to be changed, go to the 
-												<a href="{{message.shipment_url}}">
-													<span>{{ message.shipment_name }}</span>
-												</a>
-												 to modify the shipment status
+												If the shipment status needs to be changed, go to the to Shipments section > Select 'Completed' tab > Click on shipment name to modify the shipment status.
 											</li>
 										</ul>
 									</span>
