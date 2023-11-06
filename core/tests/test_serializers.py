@@ -42,6 +42,7 @@ def test_org_serializer(request_factory, org):
         'push_notify_environmental',
         'email_notify_geofence',
         'email_notify_environmental',
+        'enable_fujitsu_verification',
     ]
     assert set(data.keys()) == set(keys)
 

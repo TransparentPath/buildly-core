@@ -178,6 +178,7 @@ class Organization(models.Model):
     push_notify_environmental = models.BooleanField('Allow Push Notification for Environmental Alerts', default=True)
     email_notify_geofence = models.BooleanField('Allow Email Notification for Geofence Alerts', default=True)
     email_notify_environmental = models.BooleanField('Allow Email Notification for Environmental Alerts', default=True)
+    enable_fujitsu_verification = models.BooleanField('Enable Fujitsu Integration for verification of shipment data', default=False)
 
     class Meta:
         ordering = ('name',)
