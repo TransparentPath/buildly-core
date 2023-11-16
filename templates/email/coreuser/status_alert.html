@@ -82,7 +82,7 @@
 									</span>
 								</p>
 							{% endif %}
-							{% is message.isWarehouse %}
+							{% if message.isWarehouse %}
 								<p>
 									<strong>NOTE: </strong>
 									<span>The shipment status will automatically be set to 'Battery Depleted' when the battery level is at 5% or below..</span>
