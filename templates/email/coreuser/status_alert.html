@@ -63,6 +63,10 @@
 										<strong>ACTION: </strong>
 										<span>Alerts will continue to be sent while shipment is in storage. Please change the status to 'Completed' or 'Damaged' when storage of shipment is complete.</span>
 									</p>
+									<p>
+										<strong>NOTE: </strong>
+										<span>The shipment status will automatically be set to 'Battery Depleted' when the battery level is at 5% or below..</span>
+									</p>
 								{% else %}
 									<p>
 										<strong>ACTION: </strong>
@@ -80,12 +84,6 @@
 											</li>
 										</ul>
 									</span>
-								</p>
-							{% endif %}
-							{% if message.isWarehouse %}
-								<p>
-									<strong>NOTE: </strong>
-									<span>The shipment status will automatically be set to 'Battery Depleted' when the battery level is at 5% or below..</span>
 								</p>
 							{% endif %}
 						</div>
