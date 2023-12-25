@@ -30,6 +30,19 @@ def test_org_serializer(request_factory, org):
         'radius',
         'organization_type',
         'abbrevation',
+        'default_max_temperature',
+        'default_min_temperature',
+        'default_max_humidity',
+        'default_min_humidity',
+        'default_shock',
+        'default_light',
+        'default_transmission_interval',
+        'default_measurement_interval',
+        'push_notify_geofence',
+        'push_notify_environmental',
+        'email_notify_geofence',
+        'email_notify_environmental',
+        'enable_fujitsu_verification',
     ]
     assert set(data.keys()) == set(keys)
 

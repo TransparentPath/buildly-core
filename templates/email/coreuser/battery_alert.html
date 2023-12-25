@@ -34,71 +34,41 @@
 						<div>
 							<p style="color:{{ message.color }}">{{message.body_text}}</p>
 							<p>
-								<strong>Shipment: </strong>
+								<strong>SHIPMENT: </strong>
 								<a href="{{message.shipment_url}}">
-									<span>{{ message.shipment_name }}</span>
+									<span>{{ message.shipment }}</span>
 								</a>
 							</p>
 
-							{% if message.severity == 'error' %}
-								<p>
-									<strong>ISSUE: </strong>
-									<span>{{ message.alert_message }}{{ message.local_time }}</span>
-								</p>
-							{% elif message.severity == 'info' %}
-								<p>
-									<strong>ISSUE: </strong>
-									<span>{{ message.alert_message }}{{ message.local_time }}</span>
-								</p>
-							{% elif message.severity == 'success' %}
-								<p>
-									<strong>RESOLUTION: </strong>
-									<span>{{ message.alert_message }}{{ message.local_time }}</span>
-								</p>
-							{% endif %}
-
-							{% if message.severity == 'error' %}
-								<p>
-									<strong>ISSUE LOCATION: </strong>
-									<span>{{ message.location }}</span>
-								</p>
-							{% elif message.severity == 'info' %}
-								<p>
-									<strong>ISSUE LOCATION: </strong>
-									<span>{{ message.location }}</span>
-								</p>
-							{% elif message.severity == 'success' %}
-								<p>
-									<strong>RESOLUTION LOCATION: </strong>
-									<span>{{ message.location }}</span>
-								</p>
-							{% endif %}
-
-							{% if message.severity == 'error' %}
-								<p>
-									<strong>ITEMS IN JEOPARDY: </strong>
-									<span>{{ message.items }}</span>
-								</p>
-							{% elif message.severity == 'info' %}
-								<p>
-									<strong>ITEMS IN JEOPARDY: </strong>
-									<span>{{ message.items }}</span>
-								</p>
-							{% elif message.severity == 'success' %}
-								<p>
-									<strong>ITEMS RECOVERED: </strong>
-									<span>{{ message.items }}</span>
-								</p>
-							{% endif %}
-
 							<p>
-								<strong>SHIPMENT VALUE: </strong>
-								<span>{{ message.shipment_value }}{{ message.currency }}</span>
+								<strong>LOCATION: </strong>
+								<span>{{ message.location }}</span>
 							</p>
-							<p>
-								<strong>ACTION: </strong>
-								<span>Please verify any product damage or loss as soon as possible.</span>
-							</p>
+
+							{% if message.alert_level == 1 %}
+								<p>
+									<strong>ACTION: </strong>
+									<span>Please adjust the transmission and measurement intervals so that the shipment data is collected until completion.</span>
+								</p>
+							{% elif message.alert_level == 2 %}
+								<p>
+									<strong>ACTION: </strong>
+									<span>Please adjust the transmission and measurement intervals so that the shipment data is collected until completion.</span>
+								</p>
+								<p>
+									<strong>NOTE: </strong>
+									<span>If no action is taken, the shipment status will automatically change to 'Battery Depleted' when the battery level reaches 5% or below.</span>
+								</p>
+							{% elif message.alert_level == 3 %}
+								<p>
+									<strong>ACTION: </strong>
+									<span>Sensor needs to be replaced with a sensor that has a fully charged battery.</span>
+								</p>
+								<p>
+									<strong>NOTE: </strong>
+									<span>Visit the Reporting section to view the data.</span>
+								</p>
+							{% endif %}
 						</div>
 					</td>
 				</tr>

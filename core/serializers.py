@@ -498,6 +498,15 @@ class CoreUserEmailAlertSerializer(serializers.Serializer):
     messages = serializers.JSONField()
 
 
+class CoreUserStatusBatteryAlertSerializer(serializers.Serializer):
+    """
+    Serializer for email alert of shipment
+    """
+
+    organization_uuid = serializers.UUIDField()
+    message = serializers.JSONField()
+
+
 class OrganizationTypeSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField()
 
