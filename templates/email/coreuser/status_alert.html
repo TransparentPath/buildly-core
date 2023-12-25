@@ -34,71 +34,58 @@
 						<div>
 							<p style="color:{{ message.color }}">{{message.body_text}}</p>
 							<p>
-								<strong>Shipment: </strong>
+								<strong>SHIPMENT: </strong>
 								<a href="{{message.shipment_url}}">
-									<span>{{ message.shipment_name }}</span>
+									<span>{{ message.shipment }}</span>
 								</a>
 							</p>
 
-							{% if message.severity == 'error' %}
+							{% if message.origin %}
 								<p>
-									<strong>ISSUE: </strong>
-									<span>{{ message.alert_message }}{{ message.local_time }}</span>
-								</p>
-							{% elif message.severity == 'info' %}
-								<p>
-									<strong>ISSUE: </strong>
-									<span>{{ message.alert_message }}{{ message.local_time }}</span>
-								</p>
-							{% elif message.severity == 'success' %}
-								<p>
-									<strong>RESOLUTION: </strong>
-									<span>{{ message.alert_message }}{{ message.local_time }}</span>
-								</p>
-							{% endif %}
-
-							{% if message.severity == 'error' %}
-								<p>
-									<strong>ISSUE LOCATION: </strong>
-									<span>{{ message.location }}</span>
-								</p>
-							{% elif message.severity == 'info' %}
-								<p>
-									<strong>ISSUE LOCATION: </strong>
-									<span>{{ message.location }}</span>
-								</p>
-							{% elif message.severity == 'success' %}
-								<p>
-									<strong>RESOLUTION LOCATION: </strong>
-									<span>{{ message.location }}</span>
-								</p>
-							{% endif %}
-
-							{% if message.severity == 'error' %}
-								<p>
-									<strong>ITEMS IN JEOPARDY: </strong>
-									<span>{{ message.items }}</span>
-								</p>
-							{% elif message.severity == 'info' %}
-								<p>
-									<strong>ITEMS IN JEOPARDY: </strong>
-									<span>{{ message.items }}</span>
-								</p>
-							{% elif message.severity == 'success' %}
-								<p>
-									<strong>ITEMS RECOVERED: </strong>
-									<span>{{ message.items }}</span>
+									<strong>ORIGIN: </strong>
+									<span>{{ message.origin }}</span>
 								</p>
 							{% endif %}
 
 							<p>
-								<strong>SHIPMENT VALUE: </strong>
-								<span>{{ message.shipment_value }}{{ message.currency }}</span>
+								<strong>DESTINATION: </strong>
+								<span>{{ message.destination }}</span>
 							</p>
-							<p>
-								<strong>ACTION: </strong>
-								<span>Please verify any product damage or loss as soon as possible.</span>
-							</p>
+
+							{% if message.status == 'En route' %}
+								<p>
+									<strong>ACTION: </strong>
+									<span>No action needed at this time.</span>
+								</p>
+							{% elif message.status == 'Arrived' %}
+								{% if message.isWarehouse %}
+									<p>
+										<strong>ACTION: </strong>
+										<span>Alerts will continue to be sent while shipment is in storage. Please change the status to 'Completed' or 'Damaged' when storage of shipment is complete.</span>
+									</p>
+									<p>
+										<strong>NOTE: </strong>
+										<span>The shipment status will automatically be set to 'Battery Depleted' when the battery level is at 5% or below..</span>
+									</p>
+								{% else %}
+									<p>
+										<strong>ACTION: </strong>
+										<span>Please change the status to 'Completed' or 'Damaged'. If no action is taken within 24 hours, the shipment status will automatically change to 'Completed'.</span>
+									</p>
+								{% endif %}
+							{% elif message.status == 'Completed' %}
+								<p>
+									<strong>ACTION: </strong>
+									<span>Shipment status has changed to 'Completed'. 
+										<ul>
+											<li>If this shipment is completed, no further action is needed.</li>
+											<li>
+												If the shipment status needs to be changed, go to the to Shipments section > Select 'Completed' tab > Click on shipment name to modify the shipment status.
+											</li>
+										</ul>
+									</span>
+								</p>
+							{% endif %}
 						</div>
 					</td>
 				</tr>
