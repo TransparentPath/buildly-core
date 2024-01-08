@@ -489,8 +489,8 @@ class TestCoreUserRead(object):
         'privacy_disclaimer_accepted',
         'organization',
         'core_groups',
-        'email_preferences',
-        'push_preferences',
+        'geo_alert_preferences',
+        'env_alert_preferences',
         'user_timezone',
     }
 

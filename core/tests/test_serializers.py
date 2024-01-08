@@ -38,10 +38,6 @@ def test_org_serializer(request_factory, org):
         'default_light',
         'default_transmission_interval',
         'default_measurement_interval',
-        'push_notify_geofence',
-        'push_notify_environmental',
-        'email_notify_geofence',
-        'email_notify_environmental',
         'enable_fujitsu_verification',
     ]
     assert set(data.keys()) == set(keys)
@@ -85,8 +81,8 @@ def test_core_user_serializer(request_factory, org_member):
         'privacy_disclaimer_accepted',
         'organization',
         'core_groups',
-        'email_preferences',
-        'push_preferences',
+        'geo_alert_preferences',
+        'env_alert_preferences',
         'user_timezone',
     ]
     assert set(data.keys()) == set(keys)

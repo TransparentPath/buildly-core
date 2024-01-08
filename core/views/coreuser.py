@@ -353,23 +353,22 @@ class CoreUserViewSet(
                     )
                     for user in core_users:
                         email_address = user.email
-                        preferences = user.email_preferences
-                        if preferences and (
-                            preferences.get('environmental', None)
-                            or preferences.get('geofence', None)
-                        ):
-                            user_timezone = user.user_timezone
-                            if user_timezone:
-                                message['local_time'] = alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
-                            else:
-                                message['local_time'] = alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
-                            send_email(
-                                email_address,
-                                subject,
-                                context,
-                                template_name,
-                                html_template_name,
-                            )
+                        geo_preferences = user.geo_alert_preferences
+                        env_preferences = user.env_alert_preferences
+                        if ((geo_preferences and geo_preferences.get('email', None))
+                            or (env_preferences and env_preferences.get('email', None))):
+                                user_timezone = user.user_timezone
+                                if user_timezone:
+                                    message['local_time'] = alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                                else:
+                                    message['local_time'] = alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                                send_email(
+                                    email_address,
+                                    subject,
+                                    context,
+                                    template_name,
+                                    html_template_name,
+                                )
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
@@ -422,18 +421,17 @@ class CoreUserViewSet(
             )
             for user in core_users:
                 email_address = user.email
-                preferences = user.email_preferences
-                if preferences and (
-                    preferences.get('environmental', None)
-                    or preferences.get('geofence', None)
-                ):
-                    send_email(
-                        email_address,
-                        subject,
-                        context,
-                        template_name,
-                        html_template_name,
-                    )
+                geo_preferences = user.geo_alert_preferences
+                env_preferences = user.env_alert_preferences
+                if ((geo_preferences and geo_preferences.get('email', None))
+                    or (env_preferences and env_preferences.get('email', None))):
+                        send_email(
+                            email_address,
+                            subject,
+                            context,
+                            template_name,
+                            html_template_name,
+                        )
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
@@ -474,18 +472,17 @@ class CoreUserViewSet(
             )
             for user in core_users:
                 email_address = user.email
-                preferences = user.email_preferences
-                if preferences and (
-                    preferences.get('environmental', None)
-                    or preferences.get('geofence', None)
-                ):
-                    send_email(
-                        email_address,
-                        subject,
-                        context,
-                        template_name,
-                        html_template_name,
-                    )
+                geo_preferences = user.geo_alert_preferences
+                env_preferences = user.env_alert_preferences
+                if ((geo_preferences and geo_preferences.get('email', None))
+                    or (env_preferences and env_preferences.get('email', None))):
+                        send_email(
+                            email_address,
+                            subject,
+                            context,
+                            template_name,
+                            html_template_name,
+                        )
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
