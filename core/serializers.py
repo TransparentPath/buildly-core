@@ -138,6 +138,8 @@ class CoreUserSerializer(serializers.ModelSerializer):
             'invitation_token',
             'geo_alert_preferences',
             'env_alert_preferences',
+            'sms_number',
+            'whatsApp_number',
             'user_timezone',
         )
         read_only_fields = ('core_user_uuid', 'organization')
@@ -287,6 +289,8 @@ class CoreUserProfileSerializer(serializers.Serializer):
     organization_name = serializers.CharField(required=False)
     geo_alert_preferences = serializers.JSONField(required=False)
     env_alert_preferences = serializers.JSONField(required=False)
+    sms_number = serializers.CharField(required=False)
+    whatsApp_number = serializers.CharField(required=False)
     user_timezone = serializers.CharField(required=False)
 
     class Meta:
@@ -300,6 +304,8 @@ class CoreUserProfileSerializer(serializers.Serializer):
             'organization_name',
             'geo_alert_preferences',
             'env_alert_preferences',
+            'sms_number',
+            'whatsApp_number',
             'user_timezone',
         )
 
@@ -324,6 +330,8 @@ class CoreUserProfileSerializer(serializers.Serializer):
         instance.env_alert_preferences = validated_data.get(
             'env_alert_preferences', instance.env_alert_preferences
         )
+        instance.sms_number = validated_data.get('sms_number', instance.sms_number)
+        instance.whatsApp_number = validated_data.get('whatsApp_number', instance.whatsApp_number)
         instance.user_timezone = validated_data.get(
             'user_timezone', instance.user_timezone
         )

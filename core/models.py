@@ -3,6 +3,7 @@ import uuid
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.contrib.sites.models import Site
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -289,6 +290,8 @@ class CoreUser(AbstractUser):
     edit_date = models.DateTimeField(null=True, blank=True)
     geo_alert_preferences = JSONField(blank=True, null=True, default=get_preferences_default)
     env_alert_preferences = JSONField(blank=True, null=True, default=get_preferences_default)
+    sms_number = models.CharField(blank=True, null=True, max_length=15)
+    whatsApp_number = models.CharField(blank=True, null=True, max_length=15)
     user_timezone = models.CharField(blank=True, null=True, max_length=255)
 
     REQUIRED_FIELDS = []

@@ -97,7 +97,7 @@ class CoreUserAdmin(UserAdmin):
                 )
             },
         ),
-        (_('Preferences'), {'fields': ('geo_alert_preferences', 'env_alert_preferences')}),
+        (_('Preferences'), {'fields': ('geo_alert_preferences', 'env_alert_preferences', 'sms_number', 'whatsApp_number')}),
         (
             _('Important dates'),
             {'fields': ('last_login', 'date_joined', 'create_date', 'edit_date')},

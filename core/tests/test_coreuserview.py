@@ -491,6 +491,8 @@ class TestCoreUserRead(object):
         'core_groups',
         'geo_alert_preferences',
         'env_alert_preferences',
+        'sms_number',
+        'whatsApp_number',
         'user_timezone',
     }
 

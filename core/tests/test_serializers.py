@@ -83,6 +83,8 @@ def test_core_user_serializer(request_factory, org_member):
         'core_groups',
         'geo_alert_preferences',
         'env_alert_preferences',
+        'sms_number',
+        'whatsApp_number',
         'user_timezone',
     ]
     assert set(data.keys()) == set(keys)
