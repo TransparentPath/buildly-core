@@ -21,8 +21,9 @@ class CoreGroupViewSet(viewsets.ModelViewSet):
 
         queryset = self.get_queryset()
         if not request.user.is_global_admin:
-            # TODO: Shall user also view global groups?
-            queryset = queryset.filter(organization_id=request.user.organization_id)
+            q1 = queryset.filter(organization=None)
+            q2 = queryset.filter(organization_id=request.user.organization_id)
+            queryset = q1.union(q2, all=True)
         return Response(self.get_serializer(queryset, many=True).data)
 
     def perform_create(self, serializer):
