@@ -5,7 +5,7 @@ import django_filters
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from core.models import Organization, OrganizationType
+from core.models import Organization, OrganizationType, CoreUser
 from core.serializers import OrganizationSerializer, OrganizationTypeSerializer
 from core.permissions import AllowOnlyOrgAdmin, IsOrgMember
 from django.views.decorators.csrf import csrf_exempt
@@ -43,6 +43,20 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             organization_id = request.user.organization_id
             queryset = queryset.filter(pk=organization_id)
         serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    def update(self, request, *args, **kwargs):
+        organization = self.get_object()
+        serializer = self.get_serializer(organization, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        users = CoreUser.objects.filter(organization=organization)
+        for user in users:
+            user.geo_alert_preferences = {**user.geo_alert_preferences, 'email': request.data.get('enable_geofence_emails', organization.enable_geofence_emails)}
+            user.env_alert_preferences = {**user.env_alert_preferences, 'email': request.data.get('enable_env_emails', organization.enable_env_emails)}
+            user.save()
+
+        serializer.save()
         return Response(serializer.data)
 
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
