@@ -325,7 +325,7 @@ class CoreUserViewSet(
         messages = request.data['messages']
         try:
             organization = Organization.objects.get(organization_uuid=org_uuid)
-            if organization.email_notify_geofence or organization.email_notify_environmental:
+            if organization.enable_geofence_emails or organization.enable_env_emails:
                 for message in messages:
                     subject = message['header']
                     message['color'] = color_codes.get(message['severity'])
@@ -335,7 +335,7 @@ class CoreUserViewSet(
                     html_template_name = 'email/coreuser/shipment_alert.html'
 
                     # Set shipment url
-                    message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+                    message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id']
 
                     # Get Currency default for the organization
                     uom_currency_url = (
@@ -413,7 +413,7 @@ class CoreUserViewSet(
             html_template_name = 'email/coreuser/status_alert.html'
 
             # Set shipment url
-            message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id']
 
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
@@ -435,7 +435,7 @@ class CoreUserViewSet(
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
-            {'detail': 'Battery alert messages were sent successfully on email.'},
+            {'detail': 'Status alert messages were sent successfully on email.'},
             status=status.HTTP_200_OK,
         )
     
@@ -464,7 +464,7 @@ class CoreUserViewSet(
             html_template_name = 'email/coreuser/battery_alert.html'
 
             # Set shipment url
-            message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id']
 
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
@@ -486,7 +486,7 @@ class CoreUserViewSet(
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
-            {'detail': 'Status alert messages were sent successfully on email.'},
+            {'detail': 'Battery alert messages were sent successfully on email.'},
             status=status.HTTP_200_OK,
         )
 
