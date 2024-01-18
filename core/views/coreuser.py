@@ -324,40 +324,37 @@ class CoreUserViewSet(
         org_uuid = request.data['organization_uuid']
         messages = request.data['messages']
         try:
-            organization = Organization.objects.get(organization_uuid=org_uuid)
-            if organization.email_notify_geofence or organization.email_notify_environmental:
-                for message in messages:
-                    subject = message['header']
-                    message['color'] = color_codes.get(message['severity'])
-                    context = {'message': message}
-                    alert_time = datetime.strptime(message['alert_time'], "%Y-%m-%dT%H:%M:%S.%f%z")
-                    template_name = 'email/coreuser/shipment_alert.txt'
-                    html_template_name = 'email/coreuser/shipment_alert.html'
+            for message in messages:
+                subject = message['header']
+                message['color'] = color_codes.get(message['severity'])
+                context = {'message': message}
+                alert_time = datetime.strptime(message['alert_time'], "%Y-%m-%dT%H:%M:%S.%f%z")
+                template_name = 'email/coreuser/shipment_alert.txt'
+                html_template_name = 'email/coreuser/shipment_alert.html'
 
-                    # Set shipment url
-                    message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+                # Set shipment url
+                message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
 
-                    # Get Currency default for the organization
-                    uom_currency_url = (
-                        settings.TP_SHIPMENT_URL
-                        + 'unit_of_measure/?organization_uuid='
-                        + org_uuid
-                        + '&unit_of_measure_for=Currency'
-                    )
-                    uom_currency = requests.get(uom_currency_url).json()[0]
-                    message['currency'] = ' ' + uom_currency.get('unit_of_measure')
+                # Get Currency default for the organization
+                uom_currency_url = (
+                    settings.TP_SHIPMENT_URL
+                    + 'unit_of_measure/?organization_uuid='
+                    + org_uuid
+                    + '&unit_of_measure_for=Currency'
+                )
+                uom_currency = requests.get(uom_currency_url).json()[0]
+                message['currency'] = ' ' + uom_currency.get('unit_of_measure')
 
-                    # TODO send email via preferences
-                    core_users = CoreUser.objects.filter(
-                        organization__organization_uuid=org_uuid
-                    )
-                    for user in core_users:
-                        email_address = user.email
-                        preferences = user.email_preferences
-                        if preferences and (
-                            preferences.get('environmental', None)
-                            or preferences.get('geofence', None)
-                        ):
+                # TODO send email via preferences
+                core_users = CoreUser.objects.filter(
+                    organization__organization_uuid=org_uuid
+                )
+                for user in core_users:
+                    email_address = user.email
+                    geo_preferences = user.geo_alert_preferences
+                    env_preferences = user.env_alert_preferences
+                    if ((geo_preferences and geo_preferences.get('email', False))
+                        or (env_preferences and env_preferences.get('email', False))):
                             user_timezone = user.user_timezone
                             if user_timezone:
                                 message['local_time'] = alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
@@ -414,7 +411,7 @@ class CoreUserViewSet(
             html_template_name = 'email/coreuser/status_alert.html'
 
             # Set shipment url
-            message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
 
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
@@ -422,22 +419,21 @@ class CoreUserViewSet(
             )
             for user in core_users:
                 email_address = user.email
-                preferences = user.email_preferences
-                if preferences and (
-                    preferences.get('environmental', None)
-                    or preferences.get('geofence', None)
-                ):
-                    send_email(
-                        email_address,
-                        subject,
-                        context,
-                        template_name,
-                        html_template_name,
-                    )
+                geo_preferences = user.geo_alert_preferences
+                env_preferences = user.env_alert_preferences
+                if ((geo_preferences and geo_preferences.get('email', False))
+                    or (env_preferences and env_preferences.get('email', False))):
+                        send_email(
+                            email_address,
+                            subject,
+                            context,
+                            template_name,
+                            html_template_name,
+                        )
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
-            {'detail': 'Battery alert messages were sent successfully on email.'},
+            {'detail': 'Status alert messages were sent successfully on email.'},
             status=status.HTTP_200_OK,
         )
     
@@ -466,7 +462,7 @@ class CoreUserViewSet(
             html_template_name = 'email/coreuser/battery_alert.html'
 
             # Set shipment url
-            message['shipment_url'] = urljoin(settings.FRONTEND_URL, '/app/shipment/')
+            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
 
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
@@ -474,22 +470,21 @@ class CoreUserViewSet(
             )
             for user in core_users:
                 email_address = user.email
-                preferences = user.email_preferences
-                if preferences and (
-                    preferences.get('environmental', None)
-                    or preferences.get('geofence', None)
-                ):
-                    send_email(
-                        email_address,
-                        subject,
-                        context,
-                        template_name,
-                        html_template_name,
-                    )
+                geo_preferences = user.geo_alert_preferences
+                env_preferences = user.env_alert_preferences
+                if ((geo_preferences and geo_preferences.get('email', False))
+                    or (env_preferences and env_preferences.get('email', False))):
+                        send_email(
+                            email_address,
+                            subject,
+                            context,
+                            template_name,
+                            html_template_name,
+                        )
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
-            {'detail': 'Status alert messages were sent successfully on email.'},
+            {'detail': 'Battery alert messages were sent successfully on email.'},
             status=status.HTTP_200_OK,
         )
 

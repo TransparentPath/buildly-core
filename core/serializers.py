@@ -136,8 +136,10 @@ class CoreUserSerializer(serializers.ModelSerializer):
             'organization',
             'core_groups',
             'invitation_token',
-            'email_preferences',
-            'push_preferences',
+            'geo_alert_preferences',
+            'env_alert_preferences',
+            'sms_number',
+            'whatsApp_number',
             'user_timezone',
         )
         read_only_fields = ('core_user_uuid', 'organization')
@@ -285,8 +287,10 @@ class CoreUserProfileSerializer(serializers.Serializer):
     contact_info = serializers.CharField(required=False)
     password = serializers.CharField(required=False)
     organization_name = serializers.CharField(required=False)
-    email_preferences = serializers.JSONField(required=False)
-    push_preferences = serializers.JSONField(required=False)
+    geo_alert_preferences = serializers.JSONField(required=False)
+    env_alert_preferences = serializers.JSONField(required=False)
+    sms_number = serializers.CharField(required=False)
+    whatsApp_number = serializers.CharField(required=False)
     user_timezone = serializers.CharField(required=False)
 
     class Meta:
@@ -298,8 +302,10 @@ class CoreUserProfileSerializer(serializers.Serializer):
             'title',
             'contact_info',
             'organization_name',
-            'email_preferences',
-            'push_preferences',
+            'geo_alert_preferences',
+            'env_alert_preferences',
+            'sms_number',
+            'whatsApp_number',
             'user_timezone',
         )
 
@@ -318,12 +324,14 @@ class CoreUserProfileSerializer(serializers.Serializer):
         instance.contact_info = validated_data.get(
             'contact_info', instance.contact_info
         )
-        instance.email_preferences = validated_data.get(
-            'email_preferences', instance.email_preferences
+        instance.geo_alert_preferences = validated_data.get(
+            'geo_alert_preferences', instance.geo_alert_preferences
         )
-        instance.push_preferences = validated_data.get(
-            'push_preferences', instance.push_preferences
+        instance.env_alert_preferences = validated_data.get(
+            'env_alert_preferences', instance.env_alert_preferences
         )
+        instance.sms_number = validated_data.get('sms_number', instance.sms_number)
+        instance.whatsApp_number = validated_data.get('whatsApp_number', instance.whatsApp_number)
         instance.user_timezone = validated_data.get(
             'user_timezone', instance.user_timezone
         )
