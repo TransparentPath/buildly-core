@@ -324,51 +324,49 @@ class CoreUserViewSet(
         org_uuid = request.data['organization_uuid']
         messages = request.data['messages']
         try:
-            organization = Organization.objects.get(organization_uuid=org_uuid)
-            if organization.enable_geofence_emails or organization.enable_env_emails:
-                for message in messages:
-                    subject = message['header']
-                    message['color'] = color_codes.get(message['severity'])
-                    context = {'message': message}
-                    alert_time = datetime.strptime(message['alert_time'], "%Y-%m-%dT%H:%M:%S.%f%z")
-                    template_name = 'email/coreuser/shipment_alert.txt'
-                    html_template_name = 'email/coreuser/shipment_alert.html'
+            for message in messages:
+                subject = message['header']
+                message['color'] = color_codes.get(message['severity'])
+                context = {'message': message}
+                alert_time = datetime.strptime(message['alert_time'], "%Y-%m-%dT%H:%M:%S.%f%z")
+                template_name = 'email/coreuser/shipment_alert.txt'
+                html_template_name = 'email/coreuser/shipment_alert.html'
 
-                    # Set shipment url
-                    message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id']
+                # Set shipment url
+                message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
 
-                    # Get Currency default for the organization
-                    uom_currency_url = (
-                        settings.TP_SHIPMENT_URL
-                        + 'unit_of_measure/?organization_uuid='
-                        + org_uuid
-                        + '&unit_of_measure_for=Currency'
-                    )
-                    uom_currency = requests.get(uom_currency_url).json()[0]
-                    message['currency'] = ' ' + uom_currency.get('unit_of_measure')
+                # Get Currency default for the organization
+                uom_currency_url = (
+                    settings.TP_SHIPMENT_URL
+                    + 'unit_of_measure/?organization_uuid='
+                    + org_uuid
+                    + '&unit_of_measure_for=Currency'
+                )
+                uom_currency = requests.get(uom_currency_url).json()[0]
+                message['currency'] = ' ' + uom_currency.get('unit_of_measure')
 
-                    # TODO send email via preferences
-                    core_users = CoreUser.objects.filter(
-                        organization__organization_uuid=org_uuid
-                    )
-                    for user in core_users:
-                        email_address = user.email
-                        geo_preferences = user.geo_alert_preferences
-                        env_preferences = user.env_alert_preferences
-                        if ((geo_preferences and geo_preferences.get('email', None))
-                            or (env_preferences and env_preferences.get('email', None))):
-                                user_timezone = user.user_timezone
-                                if user_timezone:
-                                    message['local_time'] = alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
-                                else:
-                                    message['local_time'] = alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
-                                send_email(
-                                    email_address,
-                                    subject,
-                                    context,
-                                    template_name,
-                                    html_template_name,
-                                )
+                # TODO send email via preferences
+                core_users = CoreUser.objects.filter(
+                    organization__organization_uuid=org_uuid
+                )
+                for user in core_users:
+                    email_address = user.email
+                    geo_preferences = user.geo_alert_preferences
+                    env_preferences = user.env_alert_preferences
+                    if ((geo_preferences and geo_preferences.get('email', False))
+                        or (env_preferences and env_preferences.get('email', False))):
+                            user_timezone = user.user_timezone
+                            if user_timezone:
+                                message['local_time'] = alert_time.astimezone(timezone(user_timezone)).strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                            else:
+                                message['local_time'] = alert_time.strftime('%-d %b, %Y %-I:%M:%S %p %Z')
+                            send_email(
+                                email_address,
+                                subject,
+                                context,
+                                template_name,
+                                html_template_name,
+                            )
         except Exception as ex:
             print('Exception: ', ex)
         return Response(
@@ -413,7 +411,7 @@ class CoreUserViewSet(
             html_template_name = 'email/coreuser/status_alert.html'
 
             # Set shipment url
-            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id']
+            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
 
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
@@ -423,8 +421,8 @@ class CoreUserViewSet(
                 email_address = user.email
                 geo_preferences = user.geo_alert_preferences
                 env_preferences = user.env_alert_preferences
-                if ((geo_preferences and geo_preferences.get('email', None))
-                    or (env_preferences and env_preferences.get('email', None))):
+                if ((geo_preferences and geo_preferences.get('email', False))
+                    or (env_preferences and env_preferences.get('email', False))):
                         send_email(
                             email_address,
                             subject,
@@ -464,7 +462,7 @@ class CoreUserViewSet(
             html_template_name = 'email/coreuser/battery_alert.html'
 
             # Set shipment url
-            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id']
+            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
 
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
@@ -474,8 +472,8 @@ class CoreUserViewSet(
                 email_address = user.email
                 geo_preferences = user.geo_alert_preferences
                 env_preferences = user.env_alert_preferences
-                if ((geo_preferences and geo_preferences.get('email', None))
-                    or (env_preferences and env_preferences.get('email', None))):
+                if ((geo_preferences and geo_preferences.get('email', False))
+                    or (env_preferences and env_preferences.get('email', False))):
                         send_email(
                             email_address,
                             subject,

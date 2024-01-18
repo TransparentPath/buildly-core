@@ -179,8 +179,6 @@ class Organization(models.Model):
     default_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
     default_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
     enable_fujitsu_verification = models.BooleanField('Enable Fujitsu Integration for verification of shipment data', default=False)
-    enable_geofence_emails = models.BooleanField('Enable Geofence Alerts', default=False)
-    enable_env_emails = models.BooleanField('Enable Geofence Alerts', default=False)
 
     class Meta:
         ordering = ('name',)
