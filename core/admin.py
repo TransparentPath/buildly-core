@@ -100,7 +100,7 @@ class CoreUserAdmin(UserAdmin):
         (_('Preferences'), {'fields': ('geo_alert_preferences', 'env_alert_preferences', 'sms_number', 'whatsApp_number')}),
         (
             _('Important dates'),
-            {'fields': ('last_login', 'date_joined', 'create_date', 'edit_date')},
+            {'fields': ('last_login', 'date_joined', 'create_date', 'edit_date', 'last_gdpr_shown')},
         ),
     )
     filter_horizontal = ('core_groups', 'user_permissions')

@@ -103,6 +103,16 @@ class CoreUserViewSet(
         user = get_object_or_404(queryset, pk=kwargs.get('pk'))
         serializer = self.get_serializer(instance=user, context={'request': request})
         return Response(serializer.data)
+    
+    def destroy(self, request, *args, **kwargs):
+        if AllowOnlyOrgAdmin():
+            user = self.get_object()
+            user.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response(
+                {'detail': 'Does not have permissions to perform the specified action.'}, status.HTTP_401_UNAUTHORIZED
+            )
 
     @action(methods=['GET'], detail=False)
     def me(self, request, *args, **kwargs):

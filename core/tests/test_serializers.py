@@ -86,6 +86,7 @@ def test_core_user_serializer(request_factory, org_member):
         'sms_number',
         'whatsApp_number',
         'user_timezone',
+        'last_gdpr_shown',
     ]
     assert set(data.keys()) == set(keys)
     assert isinstance(data['organization'], dict)
