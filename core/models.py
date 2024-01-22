@@ -292,6 +292,7 @@ class CoreUser(AbstractUser):
     sms_number = models.CharField(blank=True, null=True, max_length=15)
     whatsApp_number = models.CharField(blank=True, null=True, max_length=15)
     user_timezone = models.CharField(blank=True, null=True, max_length=255)
+    last_gdpr_shown = models.DateTimeField(null=True, blank=True)
 
     REQUIRED_FIELDS = []
 

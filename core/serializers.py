@@ -141,6 +141,7 @@ class CoreUserSerializer(serializers.ModelSerializer):
             'sms_number',
             'whatsApp_number',
             'user_timezone',
+            'last_gdpr_shown',
         )
         read_only_fields = ('core_user_uuid', 'organization')
         depth = 1
@@ -292,6 +293,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
     sms_number = serializers.CharField(required=False)
     whatsApp_number = serializers.CharField(required=False)
     user_timezone = serializers.CharField(required=False)
+    last_gdpr_shown = serializers.DateTimeField(required=False)
 
     class Meta:
         model = CoreUser
@@ -307,6 +309,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
             'sms_number',
             'whatsApp_number',
             'user_timezone',
+            'last_gdpr_shown',
         )
 
     def update(self, instance, validated_data):
@@ -335,6 +338,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
         instance.user_timezone = validated_data.get(
             'user_timezone', instance.user_timezone
         )
+        instance.last_gdpr_shown = validated_data.get('last_gdpr_shown', instance.last_gdpr_shown)
         password = validated_data.get('password', None)
         if password is not None:
             instance.set_password(password)

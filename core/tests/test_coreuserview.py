@@ -494,6 +494,7 @@ class TestCoreUserRead(object):
         'sms_number',
         'whatsApp_number',
         'user_timezone',
+        'last_gdpr_shown',
     }
 
     def test_coreuser_list(self, request_factory, org_member):
