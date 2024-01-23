@@ -1,5 +1,5 @@
 import requests
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlencode
 
 from django.conf import settings
 from django.db import transaction
@@ -343,7 +343,7 @@ class CoreUserViewSet(
                 html_template_name = 'email/coreuser/shipment_alert.html'
 
                 # Set shipment url
-                message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
+                message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + urlencode(message['shipment_status'])
 
                 # Get Currency default for the organization
                 uom_currency_url = (
@@ -421,7 +421,7 @@ class CoreUserViewSet(
             html_template_name = 'email/coreuser/status_alert.html'
 
             # Set shipment url
-            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
+            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + urlencode(message['shipment_status'])
 
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
@@ -472,7 +472,7 @@ class CoreUserViewSet(
             html_template_name = 'email/coreuser/battery_alert.html'
 
             # Set shipment url
-            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + message['shipment_status']
+            message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id'] + '&status=' + urlencode(message['shipment_status'])
 
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
