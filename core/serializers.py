@@ -165,11 +165,12 @@ class CoreUserWritableSerializer(CoreUserSerializer):
     temperature = serializers.CharField(required=False)
     weight = serializers.CharField(required=False)
     organization_abbrevation = serializers.CharField(source='organization.abbrevation', required=False)
+    org_timezone = serializers.CharField(required=False)
 
     class Meta:
         model = CoreUser
         fields = CoreUserSerializer.Meta.fields + ('password', 'organization_name', 'country', 'currency', 'date_format',
-                                                   'time_format', 'distance', 'temperature', 'weight', 'organization_abbrevation')
+                                                   'time_format', 'distance', 'temperature', 'weight', 'organization_abbrevation', 'org_timezone')
         read_only_fields = CoreUserSerializer.Meta.read_only_fields
 
     def create(self, validated_data):
@@ -188,6 +189,7 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         distance = validated_data.pop('distance', '')
         temperature = validated_data.pop('temperature', '')
         weight = validated_data.pop('weight', '')
+        org_timezone = validated_data.pop('org_timezone', '')
 
         # create core user
         invitation_token = validated_data.pop('invitation_token', None)
@@ -195,6 +197,19 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         coreuser = CoreUser.objects.create(organization=organization, **validated_data)
         # set user password
         coreuser.set_password(validated_data['password'])
+        # default organization timezone as user timezone
+        if is_new_org:
+            coreuser.user_timezone = org_timezone
+        else:
+            uom_timezone_url = (
+                settings.TP_SHIPMENT_URL
+                + 'unit_of_measure/?organization_uuid='
+                + str(organization.organization_uuid)
+                + '&unit_of_measure_for=Time%20Zone'
+            )
+            default_timezone = requests.get(uom_timezone_url).json()[0]
+            coreuser.user_timezone = default_timezone
+
         coreuser.save()
 
         # Triggers an approval email for newly registered user
@@ -273,6 +288,10 @@ class CoreUserWritableSerializer(CoreUserSerializer):
             if weight:
                 weight_data = {**data, 'unit_of_measure_for': 'Weight', 'unit_of_measure': weight}
                 requests.post(uom_url, data=weight_data).json()
+
+            if org_timezone:
+                org_timezone_data = {**data, 'unit_of_measure_for': 'Time Zone', 'unit_of_measure': org_timezone}
+                requests.post(uom_url, data=org_timezone_data).json()
 
 
         return coreuser
