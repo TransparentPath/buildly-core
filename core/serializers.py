@@ -208,7 +208,7 @@ class CoreUserWritableSerializer(CoreUserSerializer):
                 + '&unit_of_measure_for=Time%20Zone'
             )
             default_timezone = requests.get(uom_timezone_url).json()[0]
-            coreuser.user_timezone = default_timezone
+            coreuser.user_timezone = default_timezone['unit_of_measure']
 
         coreuser.save()
 
