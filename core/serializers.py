@@ -136,9 +136,12 @@ class CoreUserSerializer(serializers.ModelSerializer):
             'organization',
             'core_groups',
             'invitation_token',
-            'email_preferences',
-            'push_preferences',
+            'geo_alert_preferences',
+            'env_alert_preferences',
+            'sms_number',
+            'whatsApp_number',
             'user_timezone',
+            'last_gdpr_shown',
         )
         read_only_fields = ('core_user_uuid', 'organization')
         depth = 1
@@ -162,11 +165,12 @@ class CoreUserWritableSerializer(CoreUserSerializer):
     temperature = serializers.CharField(required=False)
     weight = serializers.CharField(required=False)
     organization_abbrevation = serializers.CharField(source='organization.abbrevation', required=False)
+    org_timezone = serializers.CharField(required=False)
 
     class Meta:
         model = CoreUser
         fields = CoreUserSerializer.Meta.fields + ('password', 'organization_name', 'country', 'currency', 'date_format',
-                                                   'time_format', 'distance', 'temperature', 'weight', 'organization_abbrevation')
+                                                   'time_format', 'distance', 'temperature', 'weight', 'organization_abbrevation', 'org_timezone')
         read_only_fields = CoreUserSerializer.Meta.read_only_fields
 
     def create(self, validated_data):
@@ -185,6 +189,7 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         distance = validated_data.pop('distance', '')
         temperature = validated_data.pop('temperature', '')
         weight = validated_data.pop('weight', '')
+        org_timezone = validated_data.pop('org_timezone', '')
 
         # create core user
         invitation_token = validated_data.pop('invitation_token', None)
@@ -192,6 +197,19 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         coreuser = CoreUser.objects.create(organization=organization, **validated_data)
         # set user password
         coreuser.set_password(validated_data['password'])
+        # default organization timezone as user timezone
+        if is_new_org:
+            coreuser.user_timezone = org_timezone
+        else:
+            uom_timezone_url = (
+                settings.TP_SHIPMENT_URL
+                + 'unit_of_measure/?organization_uuid='
+                + str(organization.organization_uuid)
+                + '&unit_of_measure_for=Time%20Zone'
+            )
+            default_timezone = requests.get(uom_timezone_url).json()[0]
+            coreuser.user_timezone = default_timezone['unit_of_measure']
+
         coreuser.save()
 
         # Triggers an approval email for newly registered user
@@ -271,6 +289,10 @@ class CoreUserWritableSerializer(CoreUserSerializer):
                 weight_data = {**data, 'unit_of_measure_for': 'Weight', 'unit_of_measure': weight}
                 requests.post(uom_url, data=weight_data).json()
 
+            if org_timezone:
+                org_timezone_data = {**data, 'unit_of_measure_for': 'Time Zone', 'unit_of_measure': org_timezone}
+                requests.post(uom_url, data=org_timezone_data).json()
+
 
         return coreuser
 
@@ -285,9 +307,12 @@ class CoreUserProfileSerializer(serializers.Serializer):
     contact_info = serializers.CharField(required=False)
     password = serializers.CharField(required=False)
     organization_name = serializers.CharField(required=False)
-    email_preferences = serializers.JSONField(required=False)
-    push_preferences = serializers.JSONField(required=False)
+    geo_alert_preferences = serializers.JSONField(required=False)
+    env_alert_preferences = serializers.JSONField(required=False)
+    sms_number = serializers.CharField(required=False)
+    whatsApp_number = serializers.CharField(required=False)
     user_timezone = serializers.CharField(required=False)
+    last_gdpr_shown = serializers.DateTimeField(required=False)
 
     class Meta:
         model = CoreUser
@@ -298,9 +323,12 @@ class CoreUserProfileSerializer(serializers.Serializer):
             'title',
             'contact_info',
             'organization_name',
-            'email_preferences',
-            'push_preferences',
+            'geo_alert_preferences',
+            'env_alert_preferences',
+            'sms_number',
+            'whatsApp_number',
             'user_timezone',
+            'last_gdpr_shown',
         )
 
     def update(self, instance, validated_data):
@@ -318,15 +346,18 @@ class CoreUserProfileSerializer(serializers.Serializer):
         instance.contact_info = validated_data.get(
             'contact_info', instance.contact_info
         )
-        instance.email_preferences = validated_data.get(
-            'email_preferences', instance.email_preferences
+        instance.geo_alert_preferences = validated_data.get(
+            'geo_alert_preferences', instance.geo_alert_preferences
         )
-        instance.push_preferences = validated_data.get(
-            'push_preferences', instance.push_preferences
+        instance.env_alert_preferences = validated_data.get(
+            'env_alert_preferences', instance.env_alert_preferences
         )
+        instance.sms_number = validated_data.get('sms_number', instance.sms_number)
+        instance.whatsApp_number = validated_data.get('whatsApp_number', instance.whatsApp_number)
         instance.user_timezone = validated_data.get(
             'user_timezone', instance.user_timezone
         )
+        instance.last_gdpr_shown = validated_data.get('last_gdpr_shown', instance.last_gdpr_shown)
         password = validated_data.get('password', None)
         if password is not None:
             instance.set_password(password)

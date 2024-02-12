@@ -36,6 +36,10 @@ TEMPLATE_TYPES = (
 )
 
 
+def get_preferences_default():
+    return {'email':True, 'sms':False, 'whatsApp':False}
+
+
 class CoreSites(models.Model):
     name = models.CharField(blank=True, null=True, max_length=255)
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
@@ -174,10 +178,12 @@ class Organization(models.Model):
     default_light = models.FloatField(max_length=20, blank=True, null=True, default=5.0)
     default_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
     default_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
-    push_notify_geofence = models.BooleanField('Allow Push Notification for Geofence Alerts', default=True)
-    push_notify_environmental = models.BooleanField('Allow Push Notification for Environmental Alerts', default=True)
-    email_notify_geofence = models.BooleanField('Allow Email Notification for Geofence Alerts', default=True)
-    email_notify_environmental = models.BooleanField('Allow Email Notification for Environmental Alerts', default=True)
+    alerts_to_supress = ArrayField(
+        models.CharField("Alert type to supress", max_length=10, null=True, blank=True),
+        null=True,
+        blank=True,
+        default=[],
+    )
     enable_fujitsu_verification = models.BooleanField('Enable Fujitsu Integration for verification of shipment data', default=False)
 
     class Meta:
@@ -287,9 +293,12 @@ class CoreUser(AbstractUser):
     privacy_disclaimer_accepted = models.BooleanField(default=False)
     create_date = models.DateTimeField(default=timezone.now)
     edit_date = models.DateTimeField(null=True, blank=True)
-    email_preferences = JSONField(blank=True, null=True)
-    push_preferences = JSONField(blank=True, null=True)
+    geo_alert_preferences = JSONField(blank=True, null=True, default=get_preferences_default)
+    env_alert_preferences = JSONField(blank=True, null=True, default=get_preferences_default)
+    sms_number = models.CharField(blank=True, null=True, max_length=15)
+    whatsApp_number = models.CharField(blank=True, null=True, max_length=15)
     user_timezone = models.CharField(blank=True, null=True, max_length=255)
+    last_gdpr_shown = models.DateTimeField(null=True, blank=True)
 
     REQUIRED_FIELDS = []
 

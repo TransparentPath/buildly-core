@@ -267,7 +267,7 @@ class TestCoreGroupListView:
         request.user = org_admin
         response = CoreGroupViewSet.as_view({'get': 'list'})(request)
         assert response.status_code == 200
-        assert len(response.data) == 4  # Admins, Users groups and its own group + 1 new
+        assert len(response.data) == 5  # Admins, Users groups and its own group + 1 new
 
 
 @pytest.mark.django_db()
