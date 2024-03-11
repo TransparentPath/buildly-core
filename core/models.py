@@ -178,8 +178,8 @@ class Organization(models.Model):
     default_light = models.FloatField(max_length=20, blank=True, null=True, default=5.0)
     default_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
     default_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
-    alerts_to_supress = ArrayField(
-        models.CharField("Alert type to supress", max_length=10, null=True, blank=True),
+    alerts_to_suppress = ArrayField(
+        models.CharField("Alert type to suppress", max_length=10, null=True, blank=True),
         null=True,
         blank=True,
         default=[],
