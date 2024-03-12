@@ -9,15 +9,19 @@ from rest_framework.test import APIClient
 import factories
 from core.models import PERMISSIONS_ORG_ADMIN
 
+TEST_ORG_UUID = uuid.uuid4()
+
 TEST_USER_DATA = {
     'first_name': 'John',
     'last_name': 'Snow',
     'email': 'test@example.com',
-    'username': 'johnsnow',
+    'username': 'test@example.com',
     'password': '123qwe',
-    'organization_uuid': uuid.uuid4(),
     # 'organization': settings.DEFAULT_ORG, # Tweaked this to support organization name from front end
     'organization_name': settings.DEFAULT_ORG,
+    "geo_alert_preferences": {"sms": False, "email": False, "whatsApp": False},
+    "env_alert_preferences": {"sms": False, "email": False, "whatsApp": False},
+    "user_role": "Admins",
 }
 
 
@@ -30,7 +34,7 @@ def superuser():
 def org():
     return factories.Organization(
         name=TEST_USER_DATA['organization_name'],
-        organization_uuid=TEST_USER_DATA['organization_uuid'],
+        organization_uuid=TEST_ORG_UUID,
     )
 
 

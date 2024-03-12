@@ -6,7 +6,7 @@ from rest_framework.reverse import reverse
 
 import factories
 from datamesh import views
-from core.tests.fixtures import org, org_admin, org_member, TEST_USER_DATA
+from core.tests.fixtures import TEST_ORG_UUID
 from .fixtures import (
     document_logic_module,
     crm_logic_module,
@@ -21,7 +21,7 @@ from .fixtures import (
 @pytest.mark.django_db()
 class TestJoinRecordBase:
 
-    session = {"jwt_organization_uuid": str(TEST_USER_DATA["organization_uuid"])}
+    session = {"jwt_organization_uuid": str(TEST_ORG_UUID)}
 
 
 @pytest.mark.django_db()
@@ -37,7 +37,7 @@ class TestJoinRecordListView(TestJoinRecordBase):
     ):
         join_records = factories.JoinRecord.create_batch(
             size=5,
-            **{"organization__organization_uuid": TEST_USER_DATA["organization_uuid"]},
+            **{"organization__organization_uuid": TEST_ORG_UUID},
         )
         request = request_factory.get("")
         request.user = org_admin
@@ -60,7 +60,7 @@ class TestJoinRecordListView(TestJoinRecordBase):
     ):
         join_records = factories.JoinRecord.create_batch(
             size=5,
-            **{"organization__organization_uuid": TEST_USER_DATA["organization_uuid"]},
+            **{"organization__organization_uuid": TEST_ORG_UUID},
         )
 
         factories.JoinRecord.create(
@@ -106,7 +106,7 @@ class TestJoinRecordListView(TestJoinRecordBase):
     ):
         join_records = factories.JoinRecord.create_batch(
             size=5,
-            **{"organization__organization_uuid": TEST_USER_DATA["organization_uuid"]},
+            **{"organization__organization_uuid": TEST_ORG_UUID},
         )
         query_params = {
             'related_record_uuid': join_records[0].related_record_uuid,
@@ -134,7 +134,7 @@ class TestJoinRecordListView(TestJoinRecordBase):
     ):
         join_records = factories.JoinRecord.create_batch(
             size=5,
-            **{"organization__organization_uuid": TEST_USER_DATA["organization_uuid"]},
+            **{"organization__organization_uuid": TEST_ORG_UUID},
         )
         query_params = {
             'related_record_uuid': f'{join_records[0].related_record_uuid},{join_records[1].related_record_uuid}'
@@ -177,7 +177,7 @@ class TestJoinRecordCreateView(TestJoinRecordBase):
         assert response.status_code == 201
         assert response.data["origin_model_name"] == "documentDocument"
         assert response.data["related_model_name"] == "crmAppointment"
-        assert response.data["organization"] == str(TEST_USER_DATA["organization_uuid"])
+        assert response.data["organization"] == str(TEST_ORG_UUID)
 
 
 @pytest.mark.django_db()

@@ -182,7 +182,7 @@ class Organization(models.Model):
         models.CharField("Alert type to suppress", max_length=10, null=True, blank=True),
         null=True,
         blank=True,
-        default=[],
+        default=list,
     )
     enable_fujitsu_verification = models.BooleanField('Enable Fujitsu Integration for verification of shipment data', default=False)
 

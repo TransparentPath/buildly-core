@@ -1,4 +1,3 @@
-import datetime
 import jwt
 import requests
 import secrets
@@ -24,7 +23,6 @@ from core.models import (
     EmailTemplate,
     LogicModule,
     Organization,
-    PERMISSIONS_ORG_ADMIN,
     TEMPLATE_RESET_PASSWORD,
     OrganizationType,
     Consortium,
@@ -157,20 +155,11 @@ class CoreUserWritableSerializer(CoreUserSerializer):
     core_groups = serializers.PrimaryKeyRelatedField(
         many=True, queryset=CoreGroup.objects.all(), required=False
     )
-    country = serializers.CharField(required=False)
-    currency = serializers.CharField(required=False)
-    date_format = serializers.CharField(required=False)
-    time_format = serializers.CharField(required=False)
-    distance = serializers.CharField(required=False)
-    temperature = serializers.CharField(required=False)
-    weight = serializers.CharField(required=False)
-    organization_abbrevation = serializers.CharField(source='organization.abbrevation', required=False)
-    org_timezone = serializers.CharField(required=False)
+    user_role = serializers.CharField(required=False)
 
     class Meta:
         model = CoreUser
-        fields = CoreUserSerializer.Meta.fields + ('password', 'organization_name', 'country', 'currency', 'date_format',
-                                                   'time_format', 'distance', 'temperature', 'weight', 'organization_abbrevation', 'org_timezone')
+        fields = CoreUserSerializer.Meta.fields + ('password', 'organization_name', 'user_role')
         read_only_fields = CoreUserSerializer.Meta.read_only_fields
 
     def create(self, validated_data):
@@ -182,25 +171,21 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         organization, is_new_org = Organization.objects.get_or_create(**organization)
 
         core_groups = validated_data.pop('core_groups', [])
-        country = validated_data.pop('country', '')
-        currency = validated_data.pop('currency', '')
-        date_format = validated_data.pop('date_format', '')
-        time_format = validated_data.pop('time_format', '')
-        distance = validated_data.pop('distance', '')
-        temperature = validated_data.pop('temperature', '')
-        weight = validated_data.pop('weight', '')
-        org_timezone = validated_data.pop('org_timezone', '')
+        user_role = validated_data.pop('user_role', '')
+
+        if user_role:
+            core_groups = CoreGroup.objects.filter(name=user_role, organization=organization.organization_uuid)
 
         # create core user
         invitation_token = validated_data.pop('invitation_token', None)
         validated_data['is_active'] = is_new_org or bool(invitation_token)
         coreuser = CoreUser.objects.create(organization=organization, **validated_data)
+
         # set user password
         coreuser.set_password(validated_data['password'])
+
         # default organization timezone as user timezone
-        if is_new_org:
-            coreuser.user_timezone = org_timezone
-        else:
+        if not is_new_org:
             uom_timezone_url = (
                 settings.TP_SHIPMENT_URL
                 + 'unit_of_measure/?organization_uuid='
@@ -210,89 +195,24 @@ class CoreUserWritableSerializer(CoreUserSerializer):
             default_timezone = requests.get(uom_timezone_url).json()[0]
             coreuser.user_timezone = default_timezone['unit_of_measure']
 
+        coreuser.core_groups.set(core_groups)
         coreuser.save()
 
-        # Triggers an approval email for newly registered user
-        approval_link = urljoin(
-            settings.FRONTEND_URL, '/app/profile/users/current-users'
-        )
-        subject = 'Approval Request'
-        template_name = 'email/coreuser/approval.txt'
-        html_template_name = 'email/coreuser/approval.html'
+        # create the used context for the E-mail templates
+        body_text = 'Administrator ' if 'admins' in user_role.lower() else core_groups[0].name
+        body_text += ' Account for ' + organization.name + ' was successfully created.'
+
         context = {
-            'approval_link': approval_link,
-            'coreuser_name': coreuser.first_name + ' ' + coreuser.last_name,
-            'organization_name': organization,
+            'signin_link': settings.FRONTEND_URL,
+            'organization_name': organization.name,
+            'body_text': body_text,
         }
-        if is_new_org:
-            admin = CoreUser.objects.filter(is_superuser=True)  # Global Admin
-        else:
-            org_admin_groups = CoreGroup.objects.filter(
-                permissions=PERMISSIONS_ORG_ADMIN, is_org_level=True
-            )
-            admin = CoreUser.objects.filter(
-                core_groups__in=org_admin_groups, organization=organization
-            )  # Organization Admin
-        if admin:
-            for users in admin:
-                send_email(
-                    users.email, subject, context, template_name, html_template_name
-                )
-
-        # add org admin role to the user if org is new
-        if is_new_org:
-            group_org_admin = CoreGroup.objects.get(
-                organization=organization,
-                is_org_level=True,
-                permissions=PERMISSIONS_ORG_ADMIN,
-            )
-            coreuser.core_groups.add(group_org_admin)
-
-        # add requested groups to the user
-        for group in core_groups:
-            coreuser.core_groups.add(group)
-
-        # create unit of measurements for the new organization
-        if is_new_org:
-            uom_url = settings.TP_SHIPMENT_URL + 'unit_of_measure/'
-            data = {
-                'organization_uuid': str(organization.organization_uuid),
-                'create_date': datetime.datetime.today().isoformat(),
-                'edit_date': datetime.datetime.today().isoformat(),
-            }
-
-            if country:
-                country_data = {**data, 'unit_of_measure_for': 'Country', 'unit_of_measure': country}
-                requests.post(uom_url, data=country_data).json()
-
-            if currency:
-                currency_data = {**data, 'unit_of_measure_for': 'Currency', 'unit_of_measure': currency}
-                requests.post(uom_url, data=currency_data).json()
-
-            if date_format:
-                date_format_data = {**data, 'unit_of_measure_for': 'Date', 'unit_of_measure': date_format}
-                requests.post(uom_url, data=date_format_data).json()
-
-            if time_format:
-                time_format_data = {**data, 'unit_of_measure_for': 'Time', 'unit_of_measure': time_format}
-                requests.post(uom_url, data=time_format_data).json()
-
-            if distance:
-                distance_data = {**data, 'unit_of_measure_for': 'Distance', 'unit_of_measure': distance}
-                requests.post(uom_url, data=distance_data).json()
-
-            if temperature:
-                temperature_data = {**data, 'unit_of_measure_for': 'Temperature', 'unit_of_measure': temperature}
-                requests.post(uom_url, data=temperature_data).json()
-
-            if weight:
-                weight_data = {**data, 'unit_of_measure_for': 'Weight', 'unit_of_measure': weight}
-                requests.post(uom_url, data=weight_data).json()
-
-            if org_timezone:
-                org_timezone_data = {**data, 'unit_of_measure_for': 'Time Zone', 'unit_of_measure': org_timezone}
-                requests.post(uom_url, data=org_timezone_data).json()
-
+        subject = 'Administrator Account Setup' if 'admins' in user_role.lower() else 'Account Setup'
+        template_name = 'email/coreuser/account_setup.txt'
+        html_template_name = 'email/coreuser/account_setup.html'
+        send_email(
+            coreuser.email, subject, context, template_name, html_template_name
+        )
 
         return coreuser
 
@@ -370,6 +290,16 @@ class CoreUserInvitationSerializer(serializers.Serializer):
     emails = serializers.ListField(
         child=serializers.EmailField(), min_length=1, max_length=10
     )
+    org_data = serializers.JSONField(required=False)
+    country = serializers.CharField(required=False)
+    currency = serializers.CharField(required=False)
+    date_format = serializers.CharField(required=False)
+    time_format = serializers.CharField(required=False)
+    distance = serializers.CharField(required=False)
+    temperature = serializers.CharField(required=False)
+    weight = serializers.CharField(required=False)
+    org_timezone = serializers.CharField(required=False)
+    user_role = serializers.CharField(required=False)
 
 
 class CoreUserResetPasswordSerializer(serializers.Serializer):
