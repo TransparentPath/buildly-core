@@ -179,7 +179,7 @@ class Organization(models.Model):
     default_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
     default_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
     alerts_to_suppress = ArrayField(
-        models.CharField("Alert type to suppress", max_length=10, null=True, blank=True),
+        models.CharField("Alert type to suppress", max_length=20, null=True, blank=True),
         null=True,
         blank=True,
         default=list,
