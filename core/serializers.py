@@ -346,7 +346,7 @@ class CoreUserResetPasswordSerializer(serializers.Serializer):
                 continue
 
             # default subject and templates
-            subject = 'Reset your password'
+            subject = 'Update Password'
             template_name = 'email/coreuser/password_reset.txt'
             html_template_name = 'email/coreuser/password_reset.html'
             count += send_email(
