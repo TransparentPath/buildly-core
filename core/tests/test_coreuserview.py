@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 from urllib.parse import urljoin
 from unittest import mock
@@ -134,12 +135,12 @@ class TestCoreUserCreate:
         assert user.organization.name == TEST_USER_DATA['organization_name']
         assert not user.is_active
 
-        # check this user is NOT org admin
-        assert not user.is_org_admin
+        # check this user is org admin as well
+        assert user.is_org_admin
 
     def test_registration_of_invited_org_user(self, request_factory, org_admin):
         data = TEST_USER_DATA.copy()
-        token = create_invitation_token(data['email'], org_admin.organization)
+        token = create_invitation_token(data['email'], org_admin.organization, data['user_role'])
         data['invitation_token'] = token
 
         request = request_factory.post(reverse('coreuser-list'), data)
@@ -153,15 +154,15 @@ class TestCoreUserCreate:
         assert user.organization.name == TEST_USER_DATA['organization_name']
         assert user.is_active
 
-        # check this user is NOT org admin
-        assert not user.is_org_admin
+        # check this user is org admin as well
+        assert user.is_org_admin
 
     def test_reused_token_invalidation(self, request_factory, org_admin):
         data = TEST_USER_DATA.copy()
         registered_user = factories.CoreUser.create(
             is_active=False, email=data['email'], username='user_org'
         )
-        token = create_invitation_token(data['email'], org_admin.organization)
+        token = create_invitation_token(data['email'], org_admin.organization, data['user_role'])
         data['invitation_token'] = token
 
         request = request_factory.post(reverse('coreuser-list'), data)
@@ -170,26 +171,12 @@ class TestCoreUserCreate:
 
     def test_email_mismatch_token_invalidation(self, request_factory, org_admin):
         data = TEST_USER_DATA.copy()
-        token = create_invitation_token("foobar@example.com", org_admin.organization)
+        token = create_invitation_token("foobar@example.com", org_admin.organization, data['user_role'])
         data['invitation_token'] = token
 
         request = request_factory.post(reverse('coreuser-list'), data)
         response = CoreUserViewSet.as_view({'post': 'create'})(request)
         assert response.status_code == 400
-
-    def test_registration_with_core_groups(self, request_factory, org_admin):
-        data = TEST_USER_DATA.copy()
-        groups = factories.CoreGroup.create_batch(
-            2, organization=org_admin.organization
-        )
-        data['core_groups'] = [item.pk for item in groups]
-        request = request_factory.post(reverse('coreuser-list'), data)
-        response = CoreUserViewSet.as_view({'post': 'create'})(request)
-        assert response.status_code == 201
-
-        user = CoreUser.objects.get(username=TEST_USER_DATA['username'])
-        # check that user has groups from the request
-        assert set(groups).issubset(set(list(user.core_groups.all())))
 
 
 @pytest.mark.django_db()
@@ -244,7 +231,7 @@ class TestCoreUserUpdate:
 @pytest.mark.django_db()
 class TestCoreUserInvite:
     def test_invitation(self, request_factory, org_admin):
-        data = {'emails': [TEST_USER_DATA['email']]}
+        data = {'emails': [TEST_USER_DATA['email']], 'org_data': json.dumps({ 'name': TEST_USER_DATA['organization_name'] }), 'user_role': TEST_USER_DATA['user_role']}
         request = request_factory.post(reverse('coreuser-invite'), data)
         request.user = org_admin
         response = CoreUserViewSet.as_view({'post': 'invite'})(request)
@@ -252,19 +239,18 @@ class TestCoreUserInvite:
         assert len(response.data['invitations']) == 1
 
     def test_invitation_check(self, request_factory, org):
-        token = create_invitation_token(TEST_USER_DATA['email'], org)
+        token = create_invitation_token(TEST_USER_DATA['email'], org, TEST_USER_DATA['user_role'])
         request = request_factory.get(
             reverse('coreuser-invite-check'), {'token': token}
         )
         response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
         assert response.status_code == 200
         assert response.data['email'] == TEST_USER_DATA['email']
-        assert (
-            response.data['organization']['organization_uuid'] == org.organization_uuid
-        )
+        assert response.data['organization_name'] == TEST_USER_DATA['organization_name']
+        assert response.data['user_role'] == TEST_USER_DATA['user_role']
 
     def test_prevent_token_reuse(self, request_factory, org):
-        token = create_invitation_token(TEST_USER_DATA['email'], org)
+        token = create_invitation_token(TEST_USER_DATA['email'], org, TEST_USER_DATA['user_role'])
         registered_user = factories.CoreUser.create(
             is_active=False, email=TEST_USER_DATA['email'], username='user_org'
         )

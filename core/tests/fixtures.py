@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 import factories
 from core.models import PERMISSIONS_ORG_ADMIN
 
-TEST_ORG_UUID = uuid.uuid4()
+TEST_ORG_UUID = uuid.UUID('7971a5bd-4b43-4c78-9a6c-d8ef56ab8556')
 
 TEST_USER_DATA = {
     'first_name': 'John',
@@ -19,8 +19,6 @@ TEST_USER_DATA = {
     'password': '123qwe',
     # 'organization': settings.DEFAULT_ORG, # Tweaked this to support organization name from front end
     'organization_name': settings.DEFAULT_ORG,
-    "geo_alert_preferences": {"sms": False, "email": False, "whatsApp": False},
-    "env_alert_preferences": {"sms": False, "email": False, "whatsApp": False},
     "user_role": "Admins",
 }
 

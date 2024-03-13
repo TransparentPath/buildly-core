@@ -39,6 +39,7 @@ def test_org_serializer(request_factory, org):
         'default_transmission_interval',
         'default_measurement_interval',
         'enable_fujitsu_verification',
+        'alerts_to_suppress',
     ]
     assert set(data.keys()) == set(keys)
 
