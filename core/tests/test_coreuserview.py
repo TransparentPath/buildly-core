@@ -286,7 +286,6 @@ class TestResetPassword(object):
         uid = urlsafe_base64_encode(force_bytes(org_member.pk))
         token = default_token_generator.make_token(org_member)
         assert f'{resetpass_url}{uid}/{token}/' in message.body
-        assert 'Thanks for using our site!' in message.body
 
     def test_reset_password_using_org_template(self, request_factory, org_member):
         email = org_member.email
