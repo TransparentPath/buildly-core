@@ -10,7 +10,7 @@ from rest_framework.response import Response
 import django_filters
 import jwt
 from drf_yasg.utils import swagger_auto_schema
-from core.models import CoreUser, Organization
+from core.models import CoreUser, Organization, CoreGroup, OrganizationType
 from core.serializers import (
     CoreUserSerializer,
     CoreUserWritableSerializer,
@@ -139,6 +139,13 @@ class CoreUserViewSet(
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        emails = request.data.get('emails', [])
+        for email in emails:
+            if CoreUser.objects.filter(email=email).exists():
+                return Response(
+                    {'message': 'User with email ' + email + ' already exists.'}, status.HTTP_409_CONFLICT
+                )
+
         links = self.perform_invite(serializer)
 
         return Response(
@@ -179,16 +186,8 @@ class CoreUserViewSet(
                 {'detail': 'Token has been used.'}, status.HTTP_401_UNAUTHORIZED
             )
 
-        organization = (
-            Organization.objects.values('organization_uuid', 'name').get(
-                organization_uuid=decoded['org_uuid']
-            )
-            if decoded['org_uuid']
-            else None
-        )
-
         return Response(
-            {'email': decoded['email'], 'organization': organization},
+            {'email': decoded['email'], 'organization_name': decoded['organization_name'], 'user_role': decoded['user_role']},
             status=status.HTTP_200_OK,
         )
 
@@ -197,20 +196,72 @@ class CoreUserViewSet(
 
         reg_location = urljoin(settings.FRONTEND_URL, settings.REGISTRATION_URL_PATH)
         reg_location = reg_location + '?token={}'
-        email_addresses = serializer.validated_data.get('emails')
-        user = self.request.user
 
-        organization = user.organization
-        registered_emails = CoreUser.objects.filter(
-            email__in=email_addresses
-        ).values_list('email', flat=True)
+        email_addresses = serializer.validated_data.get('emails')
+        org_data = serializer.validated_data.get('org_data')
+        country = serializer.validated_data.get('country', '')
+        currency = serializer.validated_data.get('currency', '')
+        date_format = serializer.validated_data.get('date_format', '')
+        time_format = serializer.validated_data.get('time_format', '')
+        distance = serializer.validated_data.get('distance', '')
+        temperature = serializer.validated_data.get('temperature', '')
+        weight = serializer.validated_data.get('weight', '')
+        org_timezone = serializer.validated_data.get('org_timezone', '')
+        user_role = serializer.validated_data.get('user_role', [])
+
+        # Check if organization exists or create new organization
+        if org_data.get('organization_type', ''):
+            org_data['organization_type'] = OrganizationType.objects.filter(id=org_data['organization_type']).first()
+
+        organization, is_new_org = Organization.objects.get_or_create(**org_data)
+
+        if is_new_org:
+            uom_url = settings.TP_SHIPMENT_URL + 'unit_of_measure/'
+            data = {
+                'organization_uuid': str(organization.organization_uuid),
+                'create_date': datetime.today().isoformat(),
+                'edit_date': datetime.today().isoformat(),
+            }
+
+            if country:
+                country_data = {**data, 'unit_of_measure_for': 'Country', 'unit_of_measure': country}
+                requests.post(uom_url, data=country_data).json()
+
+            if currency:
+                currency_data = {**data, 'unit_of_measure_for': 'Currency', 'unit_of_measure': currency}
+                requests.post(uom_url, data=currency_data).json()
+
+            if date_format:
+                date_format_data = {**data, 'unit_of_measure_for': 'Date', 'unit_of_measure': date_format}
+                requests.post(uom_url, data=date_format_data).json()
+
+            if time_format:
+                time_format_data = {**data, 'unit_of_measure_for': 'Time', 'unit_of_measure': time_format}
+                requests.post(uom_url, data=time_format_data).json()
+
+            if distance:
+                distance_data = {**data, 'unit_of_measure_for': 'Distance', 'unit_of_measure': distance}
+                requests.post(uom_url, data=distance_data).json()
+
+            if temperature:
+                temperature_data = {**data, 'unit_of_measure_for': 'Temperature', 'unit_of_measure': temperature}
+                requests.post(uom_url, data=temperature_data).json()
+
+            if weight:
+                weight_data = {**data, 'unit_of_measure_for': 'Weight', 'unit_of_measure': weight}
+                requests.post(uom_url, data=weight_data).json()
+
+            if org_timezone:
+                org_timezone_data = {**data, 'unit_of_measure_for': 'Time Zone', 'unit_of_measure': org_timezone}
+                requests.post(uom_url, data=org_timezone_data).json()
+
+        registered_emails = CoreUser.objects.filter(email__in=email_addresses).values_list('email', flat=True)
 
         links = []
         for email_address in email_addresses:
             if email_address not in registered_emails:
                 # create or update an invitation
-
-                token = create_invitation_token(email_address, organization)
+                token = create_invitation_token(email_address, organization, user_role)
 
                 # build the invitation link
                 invitation_link = self.request.build_absolute_uri(
@@ -219,12 +270,22 @@ class CoreUserViewSet(
                 links.append(invitation_link)
 
                 # create the used context for the E-mail templates
+                body_text = 'Register to access ' + organization.name + ' platform as '
+                
+                if user_role[0].lower() in 'aeiou':
+                    if 'admins' in user_role.lower():
+                        body_text += 'an Administrator'
+                    else:
+                        body_text += 'an ' + user_role
+                else:
+                    body_text += 'a ' + user_role
+
                 context = {
                     'invitation_link': invitation_link,
-                    'org_admin_name': user.name if hasattr(user, 'coreuser') else '',
-                    'organization_name': organization.name if organization else '',
+                    'organization_name': organization.name,
+                    'body_text': body_text,
                 }
-                subject = 'Application Access'  # TODO we need to make this dynamic
+                subject = 'Administrator Access' if 'admins' in user_role.lower() else 'User Access'
                 template_name = 'email/coreuser/invitation.txt'
                 html_template_name = 'email/coreuser/invitation.html'
                 send_email(
