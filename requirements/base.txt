@@ -1,4 +1,4 @@
-Django==3.2.24
+Django==3.2.25
 django-filter==2.4.0
 jsonschema==3.2.0
 django-health-check==3.6.1
@@ -13,5 +13,5 @@ pyswagger==0.8.39
 bravado-core==5.13.1
 drf-yasg==1.10.2
 requests==2.31.0
-aiohttp==3.8.6
+aiohttp==3.9.4
 django-auth-ldap==2.1.0
