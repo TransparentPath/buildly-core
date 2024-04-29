@@ -2,9 +2,13 @@
 <html lang="en" dir="ltr">
 	<head>
 		<meta charset="utf-8" />
+		<link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap"
+      rel="stylesheet"
+    />
 		<title></title>
 	</head>
-	<body style="margin: 0px">
+	<body style="margin: 0px; font-family: 'IBM Plex Sans';">
 		<div
 			style="
 				background-color: #f5f5f5;
@@ -16,7 +20,7 @@
 			<img
 				align="center"
 				alt="Transparent Path spc"
-				src="https://app.tpath.io/ff52ab9d5b614f04101dcc68a3d253e7.png"
+				src="https://storage.googleapis.com/tp-prod-bucket/images/tp-logo.png"
 				width="312.5"
 				style="
 					max-width: 625px;
@@ -37,9 +41,9 @@
 									><span
 										style="
 											font-size: 40px;
-											font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
+											font-family: 'IBM Plex Sans';
 										"
-										>Invitation from your Org <br />Admin!</span
+										>New Registration</span
 									></strong
 								></span
 							>
@@ -49,27 +53,20 @@
 								padding-top: 20px;
 								padding-bottom: 10px;
 								text-align: center;
-								font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
+								font-family: 'IBM Plex Sans';
 								color: #737581;
 							"
 						>
 							<span
 								style="
 									font-size: 12pt;
-									font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
+									font-family: 'IBM Plex Sans';
 									color: #737581;
 								"
-								>You have been invited to join
-								<span
-									style="
-										font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-										color: #151f56;
-									"
-									><strong>{{ organization_name }}</strong></span
-								>
-								on Transparent Path spc!<br />Click the button below to create your user
-								profile</span
 							>
+
+								{{ body_text }}
+							</span>
 						</p>
 					</td>
 				</tr>
@@ -80,7 +77,7 @@
 				<tr style="height: 20px">
 					<td
 						style="
-							font-family: Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+							font-family: 'IBM Plex Sans';
 							font-size: 18pt;
 							padding: 12pt;
 							background-color: #ff9f00;
@@ -100,122 +97,19 @@
 								text-decoration: none;
 								color: #ffffff;
 							"
-							>My profile</a
+							>Register</a
 						>
-					</td>
-				</tr>
-			</tbody>
-		</table>
-		<table align="center" style="width: 719px">
-			<tbody>
-				<tr style="height: 35px">
-					<td style="width: 691px; height: 35px">
-						<p>
-							<span
-								style="
-									color: #737581;
-									font-size: 12pt;
-									font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-								"
-								><i>Next steps</i></span
-							>
-						</p>
-					</td>
-				</tr>
-				<tr style="height: 33px">
-					<td
-						style="
-							color: #737581;
-							font-size: 12pt;
-							font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-							width: 691px;
-							height: 33px;
-						"
-					>
-						Once you have registered you will be within
-						<span
-							style="
-								font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-								color: #151f56;
-							"
-							><strong>{{ organization_name }}</strong></span
-						>’s portfolio. To see specific programs you must request access.
-					</td>
-				</tr>
-				<tr>
-					<td
-						style="
-							color: #737581;
-							font-size: 12pt;
-							font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-							width: 691px;
-							height: 33px;
-						"
-					>
-						You can access the Transparent Path spc knowledgebase with training materials, FAQs
-						and other useful information at our Transparent Path spc
-					</td>
-				</tr>
-				<tr>
-					<td
-						style="
-							color: #737581;
-							font-size: 12pt;
-							font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-							width: 691px;
-							height: 33px;
-						"
-					>
-						Knowledgebase:
-						<a
-							href="https://help.Transparent Path spc.com"
-							target="_blank"
-							style="text-decoration: underline; color: #0abffc"
-							><span style="color: #0abffc"> https://help.Transparent Path spc.com</span></a
-						>
-					</td>
-				</tr>
-				<tr>
-					<td></td>
-				</tr>
-				<tr>
-					<td
-						style="
-							color: #737581;
-							font-size: 12pt;
-							font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-							width: 691px;
-							height: 33px;
-						"
-					>
-						If you have any questions about this invitation please contact
-						<span
-							style="
-								font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-								color: #151f56;
-							"
-							><strong>{{ org_admin_name }}</strong></span
-						><br />
-						from
-						<span
-							style="
-								font-family: roboto, helvetica neue, helvetica, arial, sans-serif;
-								color: #151f56;
-							"
-						>
-							<strong>{{ organization_name }}</strong>
-						</span>
 					</td>
 				</tr>
 			</tbody>
 		</table>
 		<p><br /><br /><br /><br /><br /></p>
-		<div style="background-color: #f5f5f5; padding: 1px 0px 1px 0px; text-align: center">
+		<div style="background-color: #f5f5f5; padding: 1px 0px 1px 0px; text-align: center; position: fixed; bottom: 0; right: 0; left: 0;">
 			<p>
 				<span
 					style="
 						color: #737581;
-						font-family: Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+						font-family: 'IBM Plex Sans';
 						font-size: 14px;
 					"
 					>Transparent Path spc</span
@@ -223,7 +117,7 @@
 				<span
 					style="
 						color: #737581;
-						font-family: Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+						font-family: 'IBM Plex Sans';
 						font-size: 14px;
 					"
 					>1700 Westlake Avenue North Suite 200 Seattle, WA 98109</span
@@ -233,23 +127,23 @@
 				<span
 					style="
 						color: #737581;
-						font-family: Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+						font-family: 'IBM Plex Sans';
 						font-size: 14px;
 					"
-					>Have any questions or thoughts on Transparent Path spc?</span
+					>Have any questions or thoughts on Transparent Path spc</span
 				><br />
 				<span
 					style="
 						color: #737581;
-						font-family: Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+						font-family: 'IBM Plex Sans';
 						font-size: 14px;
 					"
 					>Reach out to us at anytime at
 					<a
-						href="mailto:support@tpath.io"
+						href="mailto:support@transparentpath.com"
 						target="_blank"
 						style="text-decoration: underline; color: #0abffc"
-						><span style="color: #0abffc">support@tpath.io</span></a
+						><span style="color: #0abffc">support@transparentpath.com</span></a
 					></span
 				>
 			</p>

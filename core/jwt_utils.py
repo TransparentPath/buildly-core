@@ -41,11 +41,12 @@ def payload_enricher(request):
     return {}
 
 
-def create_invitation_token(email_address: str, organization: Organization):
+def create_invitation_token(email_address: str, organization: Organization, user_role: str):
     exp_hours = datetime.timedelta(hours=settings.INVITATION_EXPIRE_HOURS)
     payload = {
         'email': email_address,
-        'org_uuid': str(organization.organization_uuid) if organization else None,
+        'organization_name': organization.name if organization else None,
+        'user_role': user_role,
         'exp': datetime.datetime.utcnow() + exp_hours,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256').decode('utf-8')
