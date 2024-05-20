@@ -207,6 +207,7 @@ class CoreUserViewSet(
         temperature = serializer.validated_data.get('temperature', '')
         weight = serializer.validated_data.get('weight', '')
         org_timezone = serializer.validated_data.get('org_timezone', '')
+        org_language = serializer.validated_data.get('org_language', '')
         user_role = serializer.validated_data.get('user_role', [])
 
         # Check if organization exists or create new organization
@@ -254,6 +255,10 @@ class CoreUserViewSet(
             if org_timezone:
                 org_timezone_data = {**data, 'unit_of_measure_for': 'Time Zone', 'unit_of_measure': org_timezone}
                 requests.post(uom_url, data=org_timezone_data).json()
+
+            if org_language:
+                org_language_data = {**data, 'unit_of_measure_for': 'Language', 'unit_of_measure': org_language}
+                requests.post(uom_url, data=org_language_data).json()
 
         registered_emails = CoreUser.objects.filter(email__in=email_addresses).values_list('email', flat=True)
 
