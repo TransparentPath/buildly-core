@@ -185,6 +185,13 @@ class Organization(models.Model):
         default=list,
     )
     enable_fujitsu_verification = models.BooleanField('Enable Fujitsu Integration for verification of shipment data', default=False)
+    is_reseller = models.BooleanField('To mark as reseller', default=False)
+    reseller_customer_orgs = ArrayField(
+        models.CharField(max_length=63),
+        blank=True,
+        null=True,
+        help_text="All customer organizations associated with this reseller.",
+    )
 
     class Meta:
         ordering = ('name',)
