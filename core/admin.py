@@ -59,6 +59,7 @@ class CoreUserAdmin(UserAdmin):
         'title',
         'is_active',
         'user_timezone',
+        'user_language',
     )
     display = 'Core User'
     list_filter = ('is_staff', 'organization')
@@ -82,6 +83,7 @@ class CoreUserAdmin(UserAdmin):
                     'contact_info',
                     'organization',
                     'user_timezone',
+                    'user_language',
                 )
             },
         ),
