@@ -43,7 +43,16 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if not request.user.is_global_admin:
             organization_id = request.user.organization_id
-            queryset = queryset.filter(pk=organization_id)
+            if request.user.is_org_admin:
+                reseller_orgs = [organization_id]
+                org = Organization.objects.get(pk=organization_id)
+                if org.is_reseller:
+                    for ro in org.reseller_customer_orgs:
+                        reseller_orgs.append(ro)
+
+                queryset = queryset.filter(pk__in=reseller_orgs)
+            else:
+                queryset = queryset.filter(pk=organization_id)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
