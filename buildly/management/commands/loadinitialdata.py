@@ -86,7 +86,7 @@ class Command(BaseCommand):
                 su = CoreUser.objects.create_superuser(
                     first_name='System',
                     last_name='Admin',
-                    username='67OAI8DD5I1O',
+                    username='admin@example.com',
                     email='admin@example.com',
                     password=user_password,
                     organization=self._default_org,

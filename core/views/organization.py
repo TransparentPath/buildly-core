@@ -1,8 +1,10 @@
 import logging
+import requests
 from django_filters.rest_framework import DjangoFilterBackend
 
 import django_filters
-from rest_framework import viewsets
+from django.conf import settings
+from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from core.models import Organization, OrganizationType
@@ -44,6 +46,16 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(pk=organization_id)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        default_uom_url = settings.TP_SHIPMENT_URL + 'create_default_unit_of_measures/'
+        default_uom_reponse = requests.post(default_uom_url, json={"organization_uuid": serializer.data['organization_uuid']}).json()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
     permission_classes = (IsOrgMember,)
