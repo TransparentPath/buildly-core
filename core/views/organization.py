@@ -53,7 +53,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         serializer.save()
 
         default_uom_url = settings.TP_SHIPMENT_URL + 'create_default_unit_of_measures/'
-        default_uom_reponse = requests.post(default_uom_url, data={"organization_uuid": serializer.data['organization_uuid']}).json()
+        requests.post(default_uom_url, data={"organization": serializer.data['organization_uuid']}).json()
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
