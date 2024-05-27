@@ -309,6 +309,7 @@ class CoreUserInvitationSerializer(serializers.Serializer):
     temperature = serializers.CharField(required=False)
     weight = serializers.CharField(required=False)
     org_timezone = serializers.CharField(required=False)
+    org_language = serializers.CharField(required=False)
     user_role = serializers.CharField(required=False)
 
 
