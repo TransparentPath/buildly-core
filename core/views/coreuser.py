@@ -92,7 +92,16 @@ class CoreUserViewSet(
         queryset = self.filter_queryset(self.get_queryset())
         if not request.user.is_global_admin:
             organization_id = request.user.organization_id
-            queryset = queryset.filter(organization_id=organization_id)
+            if request.user.is_org_admin:
+                reseller_orgs = [organization_id]
+                org = Organization.objects.get(pk=organization_id)
+                if org.is_reseller:
+                    for ro in org.reseller_customer_orgs:
+                        reseller_orgs.append(ro)
+
+                queryset = queryset.filter(organization_id__in=reseller_orgs)
+            else:
+                queryset = queryset.filter(organization_id=organization_id)
         serializer = self.get_serializer(
             instance=queryset, context={'request': request}, many=True
         )
