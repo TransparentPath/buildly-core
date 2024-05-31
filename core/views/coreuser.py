@@ -92,7 +92,16 @@ class CoreUserViewSet(
         queryset = self.filter_queryset(self.get_queryset())
         if not request.user.is_global_admin:
             organization_id = request.user.organization_id
-            queryset = queryset.filter(organization_id=organization_id)
+            if request.user.is_org_admin:
+                reseller_orgs = [organization_id]
+                org = Organization.objects.get(pk=organization_id)
+                if org.is_reseller:
+                    for ro in org.reseller_customer_orgs:
+                        reseller_orgs.append(ro)
+
+                queryset = queryset.filter(organization_id__in=reseller_orgs)
+            else:
+                queryset = queryset.filter(organization_id=organization_id)
         serializer = self.get_serializer(
             instance=queryset, context={'request': request}, many=True
         )
@@ -207,6 +216,7 @@ class CoreUserViewSet(
         temperature = serializer.validated_data.get('temperature', '')
         weight = serializer.validated_data.get('weight', '')
         org_timezone = serializer.validated_data.get('org_timezone', '')
+        org_language = serializer.validated_data.get('org_language', '')
         user_role = serializer.validated_data.get('user_role', [])
 
         # Check if organization exists or create new organization
@@ -255,6 +265,10 @@ class CoreUserViewSet(
                 org_timezone_data = {**data, 'unit_of_measure_for': 'Time Zone', 'unit_of_measure': org_timezone}
                 requests.post(uom_url, data=org_timezone_data).json()
 
+            if org_language:
+                org_language_data = {**data, 'unit_of_measure_for': 'Language', 'unit_of_measure': org_language}
+                requests.post(uom_url, data=org_language_data).json()
+
         registered_emails = CoreUser.objects.filter(email__in=email_addresses).values_list('email', flat=True)
 
         links = []
@@ -270,9 +284,9 @@ class CoreUserViewSet(
                 links.append(invitation_link)
 
                 # create the used context for the E-mail templates
-                body_text = 'Register to access ' + organization.name + ' platform as '
+                body_text = 'Register to access the ' + organization.name + ' platform as '
                 
-                if user_role[0].lower() in 'aeiou':
+                if user_role[0].lower() in 'aeiou' and user_role.lower() != 'user':
                     if 'admins' in user_role.lower():
                         body_text += 'an Administrator'
                     else:

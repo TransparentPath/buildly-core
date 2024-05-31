@@ -77,7 +77,7 @@ services:
       EMAIL_BACKEND: "SMTP"
       DEFAULT_FROM_EMAIL: "alerts@app.xparent.io"
       RESETPASS_CONFIRM_URL_PATH: "reset-password-confirm/"
-      TP_SHIPMENT_URL: 'https://demo-shipment.tpath.io/'
+      TP_SHIPMENT_URL: 'https://dev-shipment.tpath.io/'
 
 volumes:
   static-content:

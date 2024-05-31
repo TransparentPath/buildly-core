@@ -140,6 +140,7 @@ class CoreUserSerializer(serializers.ModelSerializer):
             'whatsApp_number',
             'user_timezone',
             'last_gdpr_shown',
+            'user_language',
         )
         read_only_fields = ('core_user_uuid', 'organization')
         depth = 1
@@ -192,8 +193,16 @@ class CoreUserWritableSerializer(CoreUserSerializer):
                 + str(organization.organization_uuid)
                 + '&unit_of_measure_for=Time%20Zone'
             )
+            uom_language_url = (
+                settings.TP_SHIPMENT_URL
+                + 'unit_of_measure/?organization_uuid='
+                + str(organization.organization_uuid)
+                + '&unit_of_measure_for=Language'
+            )
             default_timezone = requests.get(uom_timezone_url).json()[0]
+            default_language = requests.get(uom_language_url).json()[0]
             coreuser.user_timezone = default_timezone['unit_of_measure']
+            coreuser.user_language = default_language['unit_of_measure']
 
         coreuser.core_groups.set(core_groups)
         coreuser.save()
@@ -232,6 +241,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
     sms_number = serializers.CharField(required=False)
     whatsApp_number = serializers.CharField(required=False)
     user_timezone = serializers.CharField(required=False)
+    user_language = serializers.CharField(required=False)
     last_gdpr_shown = serializers.DateTimeField(required=False)
 
     class Meta:
@@ -249,6 +259,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
             'whatsApp_number',
             'user_timezone',
             'last_gdpr_shown',
+            'user_language',
         )
 
     def update(self, instance, validated_data):
@@ -274,9 +285,8 @@ class CoreUserProfileSerializer(serializers.Serializer):
         )
         instance.sms_number = validated_data.get('sms_number', instance.sms_number)
         instance.whatsApp_number = validated_data.get('whatsApp_number', instance.whatsApp_number)
-        instance.user_timezone = validated_data.get(
-            'user_timezone', instance.user_timezone
-        )
+        instance.user_timezone = validated_data.get('user_timezone', instance.user_timezone)
+        instance.user_language = validated_data.get('user_language', instance.user_language)
         instance.last_gdpr_shown = validated_data.get('last_gdpr_shown', instance.last_gdpr_shown)
         password = validated_data.get('password', None)
         if password is not None:
@@ -299,6 +309,7 @@ class CoreUserInvitationSerializer(serializers.Serializer):
     temperature = serializers.CharField(required=False)
     weight = serializers.CharField(required=False)
     org_timezone = serializers.CharField(required=False)
+    org_language = serializers.CharField(required=False)
     user_role = serializers.CharField(required=False)
 
 
