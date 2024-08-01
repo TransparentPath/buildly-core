@@ -9,6 +9,7 @@ def send_email(
     context: dict,
     template_name: str,
     html_template_name: str = None,
+    attachments: list = [],
 ) -> int:
     text_content = loader.render_to_string(template_name, context, using=None)
     html_content = (
@@ -20,7 +21,7 @@ def send_email(
 
 
 def send_email_body(
-    email_address: str, subject: str, text_content: str, html_content: str = None
+    email_address: str, subject: str, text_content: str, html_content: str = None, attachments: list = []
 ) -> int:
     msg = EmailMultiAlternatives(
         from_email=settings.DEFAULT_FROM_EMAIL,
@@ -32,4 +33,11 @@ def send_email_body(
         msg.reply_to = [settings.DEFAULT_REPLYTO_EMAIL]
     if html_content:
         msg.attach_alternative(html_content, "text/html")
+    if len(attachments) > 0:
+        for attachment in attachments:
+            msg.attach(
+                attachment.get('name'),
+                attachment.get('file'),
+                'application/pdf'
+            )
     return msg.send()
