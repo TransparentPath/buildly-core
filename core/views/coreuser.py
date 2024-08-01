@@ -1,6 +1,7 @@
 import requests
 from urllib.parse import urljoin, quote
 
+from django.core.files import File
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -21,6 +22,7 @@ from core.serializers import (
     CoreUserEmailAlertSerializer,
     CoreUserStatusBatteryAlertSerializer,
     CoreUserProfileSerializer,
+    CoreUserEmailShipmentReporSerializer,
 )
 
 from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsOrgMember
@@ -85,6 +87,7 @@ class CoreUserViewSet(
         'alert': CoreUserEmailAlertSerializer,
         'status_alert': CoreUserStatusBatteryAlertSerializer,
         'battery_alert': CoreUserStatusBatteryAlertSerializer,
+        'email_shipment_report': CoreUserEmailShipmentReporSerializer,
     }
 
     def list(self, request, *args, **kwargs):
@@ -572,6 +575,51 @@ class CoreUserViewSet(
             {'detail': 'Battery alert messages were sent successfully on email.'},
             status=status.HTTP_200_OK,
         )
+    
+    @swagger_auto_schema(
+        methods=['post'],
+        request_body=CoreUserStatusBatteryAlertSerializer,
+        responses=SUCCESS_RESPONSE,
+    )
+    @action(methods=['POST'], detail=False)
+    def email_shipment_report(self, request, *args, **kwargs):
+        """
+        a)Request user email and attachment files
+        b)Send Email to the user's email with attachements
+        """
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        shipment_name = request.data['shipment_name']
+        user_email = request.data['user_email']
+        report_pdf = request.FILES['report_pdf']
+
+        try:
+            subject = 'Shipment Report PDF for shipment {0}'.format(shipment_name)
+            context = {"message": {"shipment_name": shipment_name}}
+            template_name = 'email/coreuser/shipment_report.txt'
+            html_template_name = 'email/coreuser/shipment_report.html'
+
+            send_email(
+                user_email,
+                subject,
+                context,
+                template_name,
+                html_template_name,
+                [dict(file=report_pdf.read(), name=report_pdf.name)],
+            )
+            return Response(
+                {'detail': 'Report for shipment {0} was sent successfully to user.'.format(shipment_name)},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as ex:
+            print('Exception: ', ex)
+            return Response(
+                {'detail': f'Report for shipment {0} was not sent to user.'.format(shipment_name)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     @action(detail=True, methods=['patch'], name='Update Profile')
     def update_profile(self, request, pk=None, *args, **kwargs):

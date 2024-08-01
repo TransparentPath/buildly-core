@@ -17,7 +17,7 @@ def send_email(
         if html_template_name
         else None
     )
-    return send_email_body(email_address, subject, text_content, html_content)
+    return send_email_body(email_address, subject, text_content, html_content, attachments)
 
 
 def send_email_body(
