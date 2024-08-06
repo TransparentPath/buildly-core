@@ -472,11 +472,21 @@ class CoreUserEmailAlertSerializer(serializers.Serializer):
 
 class CoreUserStatusBatteryAlertSerializer(serializers.Serializer):
     """
-    Serializer for email alert of shipment
+    Serializer for email status or battery alert of shipment
     """
 
     organization_uuid = serializers.UUIDField()
     message = serializers.JSONField()
+
+
+class CoreUserEmailShipmentReporSerializer(serializers.Serializer):
+    """
+    Serializer for email shipment report
+    """
+
+    shipment_name = serializers.CharField()
+    user_email = serializers.CharField()
+    report_pdf = serializers.FileField()
 
 
 class OrganizationTypeSerializer(serializers.ModelSerializer):
