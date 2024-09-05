@@ -289,13 +289,13 @@ class CoreUserViewSet(
                 # create the used context for the E-mail templates
                 body_text = 'Register to access the ' + organization.name + ' platform as '
                 
-                if user_role[0].lower() in 'aeiou' and user_role.lower() != 'user':
+                if user_role[0].lower() in 'aeiou' and user_role.lower() != 'users':
                     if 'admins' in user_role.lower():
                         body_text += 'an Administrator'
                     else:
                         body_text += 'an ' + user_role
                 else:
-                    body_text += 'a ' + user_role
+                    body_text += 'a ' + (user_role[:-1] if user_role[-1].lower() == 's' else user_role)
 
                 context = {
                     'invitation_link': invitation_link,
