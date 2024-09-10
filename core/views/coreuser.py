@@ -1,6 +1,7 @@
 import requests
 from urllib.parse import urljoin, quote
 
+from django.core.files import File
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -21,6 +22,7 @@ from core.serializers import (
     CoreUserEmailAlertSerializer,
     CoreUserStatusBatteryAlertSerializer,
     CoreUserProfileSerializer,
+    CoreUserEmailShipmentReporSerializer,
 )
 
 from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsOrgMember
@@ -85,6 +87,7 @@ class CoreUserViewSet(
         'alert': CoreUserEmailAlertSerializer,
         'status_alert': CoreUserStatusBatteryAlertSerializer,
         'battery_alert': CoreUserStatusBatteryAlertSerializer,
+        'email_shipment_report': CoreUserEmailShipmentReporSerializer,
     }
 
     def list(self, request, *args, **kwargs):
@@ -92,7 +95,16 @@ class CoreUserViewSet(
         queryset = self.filter_queryset(self.get_queryset())
         if not request.user.is_global_admin:
             organization_id = request.user.organization_id
-            queryset = queryset.filter(organization_id=organization_id)
+            if request.user.is_org_admin:
+                reseller_orgs = [organization_id]
+                org = Organization.objects.get(pk=organization_id)
+                if org.is_reseller and org.reseller_customer_orgs is not None and len(org.reseller_customer_orgs) > 0:
+                    for ro in org.reseller_customer_orgs:
+                        reseller_orgs.append(ro)
+
+                queryset = queryset.filter(organization_id__in=reseller_orgs)
+            else:
+                queryset = queryset.filter(organization_id=organization_id)
         serializer = self.get_serializer(
             instance=queryset, context={'request': request}, many=True
         )
@@ -207,6 +219,7 @@ class CoreUserViewSet(
         temperature = serializer.validated_data.get('temperature', '')
         weight = serializer.validated_data.get('weight', '')
         org_timezone = serializer.validated_data.get('org_timezone', '')
+        org_language = serializer.validated_data.get('org_language', '')
         user_role = serializer.validated_data.get('user_role', [])
 
         # Check if organization exists or create new organization
@@ -255,6 +268,10 @@ class CoreUserViewSet(
                 org_timezone_data = {**data, 'unit_of_measure_for': 'Time Zone', 'unit_of_measure': org_timezone}
                 requests.post(uom_url, data=org_timezone_data).json()
 
+            if org_language:
+                org_language_data = {**data, 'unit_of_measure_for': 'Language', 'unit_of_measure': org_language}
+                requests.post(uom_url, data=org_language_data).json()
+
         registered_emails = CoreUser.objects.filter(email__in=email_addresses).values_list('email', flat=True)
 
         links = []
@@ -270,15 +287,15 @@ class CoreUserViewSet(
                 links.append(invitation_link)
 
                 # create the used context for the E-mail templates
-                body_text = 'Register to access ' + organization.name + ' platform as '
+                body_text = 'Register to access the ' + organization.name + ' platform as '
                 
-                if user_role[0].lower() in 'aeiou':
+                if user_role[0].lower() in 'aeiou' and user_role.lower() != 'users':
                     if 'admins' in user_role.lower():
                         body_text += 'an Administrator'
                     else:
                         body_text += 'an ' + user_role
                 else:
-                    body_text += 'a ' + user_role
+                    body_text += 'a ' + (user_role[:-1] if user_role[-1].lower() == 's' else user_role)
 
                 context = {
                     'invitation_link': invitation_link,
@@ -558,6 +575,51 @@ class CoreUserViewSet(
             {'detail': 'Battery alert messages were sent successfully on email.'},
             status=status.HTTP_200_OK,
         )
+    
+    @swagger_auto_schema(
+        methods=['post'],
+        request_body=CoreUserStatusBatteryAlertSerializer,
+        responses=SUCCESS_RESPONSE,
+    )
+    @action(methods=['POST'], detail=False)
+    def email_shipment_report(self, request, *args, **kwargs):
+        """
+        a)Request user email and attachment files
+        b)Send Email to the user's email with attachements
+        """
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        shipment_name = request.data['shipment_name']
+        user_email = request.data['user_email']
+        report_pdf = request.FILES['report_pdf']
+
+        try:
+            subject = 'Shipment Report PDF for shipment {0}'.format(shipment_name)
+            context = {"message": {"shipment_name": shipment_name}}
+            template_name = 'email/coreuser/shipment_report.txt'
+            html_template_name = 'email/coreuser/shipment_report.html'
+
+            send_email(
+                user_email,
+                subject,
+                context,
+                template_name,
+                html_template_name,
+                [dict(file=report_pdf.read(), name=report_pdf.name)],
+            )
+            return Response(
+                {'detail': 'Report for shipment {0} was sent successfully to user.'.format(shipment_name)},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as ex:
+            print('Exception: ', ex)
+            return Response(
+                {'detail': f'Report for shipment {0} was not sent to user.'.format(shipment_name)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     @action(detail=True, methods=['patch'], name='Update Profile')
     def update_profile(self, request, pk=None, *args, **kwargs):

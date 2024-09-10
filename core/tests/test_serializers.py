@@ -40,6 +40,8 @@ def test_org_serializer(request_factory, org):
         'default_measurement_interval',
         'enable_fujitsu_verification',
         'alerts_to_suppress',
+        'is_reseller',
+        'reseller_customer_orgs',
     ]
     assert set(data.keys()) == set(keys)
 
@@ -88,6 +90,7 @@ def test_core_user_serializer(request_factory, org_member):
         'whatsApp_number',
         'user_timezone',
         'last_gdpr_shown',
+        'user_language',
     ]
     assert set(data.keys()) == set(keys)
     assert isinstance(data['organization'], dict)
