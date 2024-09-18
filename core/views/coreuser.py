@@ -306,7 +306,7 @@ class CoreUserViewSet(
                 template_name = 'email/coreuser/invitation.txt'
                 html_template_name = 'email/coreuser/invitation.html'
                 send_email(
-                    email_address, subject, context, template_name, html_template_name
+                    email_address, subject, context, template_name, html_template_name, cc_email_address=[settings.SUPPORT_EMAIL_ADDRESS],
                 )
 
         return links

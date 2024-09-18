@@ -10,6 +10,7 @@ def send_email(
     template_name: str,
     html_template_name: str = None,
     attachments: list = [],
+    cc_email_address: list = [],
 ) -> int:
     text_content = loader.render_to_string(template_name, context, using=None)
     html_content = (
@@ -17,17 +18,18 @@ def send_email(
         if html_template_name
         else None
     )
-    return send_email_body(email_address, subject, text_content, html_content, attachments)
+    return send_email_body(email_address, subject, text_content, html_content, attachments, cc_email_address)
 
 
 def send_email_body(
-    email_address: str, subject: str, text_content: str, html_content: str = None, attachments: list = []
+    email_address: str, subject: str, text_content: str, html_content: str = None, attachments: list = [], cc_email_address: list = []
 ) -> int:
     msg = EmailMultiAlternatives(
         from_email=settings.DEFAULT_FROM_EMAIL,
         subject=subject,
         body=text_content,
         to=[email_address],
+        cc=cc_email_address,
     )
     if settings.DEFAULT_REPLYTO_EMAIL:
         msg.reply_to = [settings.DEFAULT_REPLYTO_EMAIL]
