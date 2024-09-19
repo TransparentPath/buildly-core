@@ -176,6 +176,7 @@ CORE_WEBSITE = "https://buildly.io"
 SUPER_USER_PASSWORD = os.getenv('SUPER_USER_PASSWORD')
 DEFAULT_ORG = os.getenv('DEFAULT_ORG')
 TP_SHIPMENT_URL = os.getenv('TP_SHIPMENT_URL')
+SUPPORT_EMAIL_ADDRESS = os.getenv('SUPPORT_EMAIL_ADDRESS')
 
 # Swagger settings - for generate_swagger management command
 
