@@ -44,6 +44,13 @@
 								</a>
 							</p>
 
+							{% if message.scheduled_departure %}
+							<p>
+								<strong>SCHEDULED DEPARTURE: </strong>
+								<span style="color:{{ message.color }}">{{ message.scheduled_departure }}</span>
+							</p>
+							{% endif %}
+
 							{% if message.origin %}
 								<p>
 									<strong>ORIGIN: </strong>
@@ -88,6 +95,11 @@
 											</li>
 										</ul>
 									</span>
+								</p>
+							{% elif message.status == 'Delayed' %}
+								<p>
+									<strong>ACTION: </strong>
+									<span>Please update the scheduled departure date.</span>
 								</p>
 							{% endif %}
 						</div>
