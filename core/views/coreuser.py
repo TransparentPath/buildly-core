@@ -501,6 +501,41 @@ class CoreUserViewSet(
             # Set shipment url
             message['shipment_url'] = settings.FRONTEND_URL + 'app/reporting/?shipment=' + message['shipment_id']
 
+            # Get UOM for date and time
+            if message['scheduled_departure']:
+                DATE_TIME_FORMAT_1 = '%Y-%m-%dT%H:%M:%S.%fZ'
+                DATE_TIME_FORMAT_2 = '%Y-%m-%dT%H:%M:%SZ'
+                DATE_TIME_FORMAT_3 = '%Y-%m-%dT%H:%M:%S.%f%z'
+                uoms = requests.get(settings.TP_SHIPMENT_URL + 'unit_of_measure/?organization_uuid=' + str(org_uuid)).json()
+
+                try:
+                    datetime_format = datetime.strptime(message['scheduled_departure'], DATE_TIME_FORMAT_1)
+                except ValueError:
+                    try:
+                        datetime_format = datetime.strptime(message['scheduled_departure'], DATE_TIME_FORMAT_2)
+                    except ValueError:
+                        datetime_format = datetime.strptime(message['scheduled_departure'], DATE_TIME_FORMAT_3)
+
+                org_date_time_format = ''
+
+                if len(uoms) > 0:
+                    date_format = [uom for uom in uoms if uom['unit_of_measure_for'].lower() == 'date'][0]['unit_of_measure']
+                    time_format = [uom for uom in uoms if uom['unit_of_measure_for'].lower() == 'time'][0]['unit_of_measure']
+
+                if date_format == 'MMM DD, YYYY':
+                    org_date_time_format = '%b %d, %Y'
+                elif date_format == 'DD MMM, YYYY':
+                    org_date_time_format = '%d %b, %Y'
+                elif date_format == 'MM/DD/YYYY':
+                    org_date_time_format = '%m/%d/%Y'
+                elif date_format == 'DD/MM/YYYY':
+                    org_date_time_format = '%d/%m/%Y'
+
+                if time_format == 'hh:mm:ss A':
+                    org_date_time_format = org_date_time_format + ' %I:%M:%S %p %Z'
+                elif time_format == 'HH:mm:ss':
+                    org_date_time_format = org_date_time_format + ' %H:%M:%S %Z'
+
             # TODO send email via preferences
             core_users = CoreUser.objects.filter(
                 organization__organization_uuid=org_uuid, 
@@ -509,6 +544,9 @@ class CoreUserViewSet(
                 email_address = user.email
                 geo_preferences = user.geo_alert_preferences
                 env_preferences = user.env_alert_preferences
+                if message['scheduled_departure']:
+                    message['scheduled_departure'] = datetime_format.astimezone(timezone(user.user_timezone)).strftime(org_date_time_format)
+
                 if ((geo_preferences and geo_preferences.get('email', False))
                     or (env_preferences and env_preferences.get('email', False))):
                         send_email(
