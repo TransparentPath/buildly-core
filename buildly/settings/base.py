@@ -176,10 +176,14 @@ CORE_WEBSITE = "https://buildly.io"
 SUPER_USER_PASSWORD = os.getenv('SUPER_USER_PASSWORD')
 DEFAULT_ORG = os.getenv('DEFAULT_ORG')
 TP_SHIPMENT_URL = os.getenv('TP_SHIPMENT_URL')
-SUPPORT_EMAIL_ADDRESS = os.getenv('SUPPORT_EMAIL_ADDRESS')
+SUPPORT_EMAIL_ADDRESS = os.getenv('SUPPORT_EMAIL_ADDRESS', '').split(',')
 
 # Swagger settings - for generate_swagger management command
 
 SWAGGER_SETTINGS = {'DEFAULT_INFO': 'gateway.urls.swagger_info'}
 
 ORGANIZATION_TYPES = ['Custodian', 'Producer']
+
+# Tive tracker order settings
+TIVE_ORDER_TO_EMAIL_ADDRESS = os.getenv('TIVE_ORDER_TO_EMAIL_ADDRESS')
+TIVE_ORDER_CC_EMAIL_ADDRESSES = os.getenv('TIVE_ORDER_CC_EMAIL_ADDRESSES', '').split(',')
