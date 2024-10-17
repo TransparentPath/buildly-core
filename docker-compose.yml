@@ -75,10 +75,12 @@ services:
       EMAIL_USE_TLS: "False"
       EMAIL_SUBJECT_PREFIX: "NO REPLY: TransparentPath - "
       EMAIL_BACKEND: "SMTP"
-      DEFAULT_FROM_EMAIL: "alerts@app.xparent.io"
+      DEFAULT_FROM_EMAIL: "alerts@transparentpath.com"
       RESETPASS_CONFIRM_URL_PATH: "reset-password-confirm/"
-      TP_SHIPMENT_URL: "https://dev-shipment.tpath.io/"
+      TP_SHIPMENT_URL: "https://dev-shipment.transparentpath.com/"
       SUPPORT_EMAIL_ADDRESS: "support@transparentpath.com"
+      TIVE_ORDER_TO_EMAIL_ADDRESS: "radhika@buildly.io"
+      TIVE_ORDER_CC_EMAIL_ADDRESSES: "tanmay@buildly.io"
 
 volumes:
   static-content:

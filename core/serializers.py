@@ -220,7 +220,7 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         template_name = 'email/coreuser/account_setup.txt'
         html_template_name = 'email/coreuser/account_setup.html'
         send_email(
-            coreuser.email, subject, context, template_name, html_template_name
+            coreuser.email, subject, context, template_name, html_template_name, cc_email_address=settings.SUPPORT_EMAIL_ADDRESS
         )
 
         return coreuser
@@ -361,7 +361,7 @@ class CoreUserResetPasswordSerializer(serializers.Serializer):
             template_name = 'email/coreuser/password_reset.txt'
             html_template_name = 'email/coreuser/password_reset.html'
             count += send_email(
-                email, subject, context, template_name, html_template_name
+                email, subject, context, template_name, html_template_name, cc_email_address=settings.SUPPORT_EMAIL_ADDRESS
             )
 
         return count
