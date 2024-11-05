@@ -45,10 +45,21 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             organization_id = request.user.organization_id
             if request.user.is_org_admin:
                 reseller_orgs = [organization_id]
+                str_org_id = [str(organization_id)]
+
+                # Get all reseller organization of this organization
                 org = Organization.objects.get(pk=organization_id)
                 if org.is_reseller and org.reseller_customer_orgs is not None and len(org.reseller_customer_orgs) > 0:
                     for ro in org.reseller_customer_orgs:
                         reseller_orgs.append(ro)
+
+                # Get all organizations that this organization is reseller of
+                reseller_customer_org_of = Organization.objects.filter(reseller_customer_orgs__contains=str_org_id)
+                if len(reseller_customer_org_of) > 0:
+                    for rcoo in reseller_customer_org_of:
+                        reseller_orgs.append(rcoo.organization_uuid)
+                        for ro in rcoo.reseller_customer_orgs:
+                            reseller_orgs.append(ro)
 
                 queryset = queryset.filter(pk__in=reseller_orgs)
             else:
