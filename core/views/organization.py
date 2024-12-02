@@ -7,7 +7,7 @@ from django.conf import settings
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from core.models import Organization, OrganizationType
+from core.models import Organization, OrganizationType, PERMISSIONS_ORG_ADMIN
 from core.serializers import OrganizationSerializer, OrganizationTypeSerializer
 from core.permissions import AllowOnlyOrgAdmin, IsOrgMember
 from django.views.decorators.csrf import csrf_exempt
@@ -44,7 +44,11 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if not request.user.is_global_admin:
             organization_id = request.user.organization_id
             if request.user.is_org_admin:
+                organization_id = request.user.core_groups.filter(permissions=PERMISSIONS_ORG_ADMIN, is_org_level=True)[0].organization_id
                 reseller_orgs = [organization_id]
+                str_org_id = [str(organization_id)]
+
+                # Get all reseller organization of this organization
                 org = Organization.objects.get(pk=organization_id)
                 if org.is_reseller and org.reseller_customer_orgs is not None and len(org.reseller_customer_orgs) > 0:
                     for ro in org.reseller_customer_orgs:

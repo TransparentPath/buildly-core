@@ -44,6 +44,13 @@
 								</a>
 							</p>
 
+							{% if message.scheduled_departure %}
+							<p>
+								<strong>SCHEDULED DEPARTURE: </strong>
+								<span style="color:{{ message.color }}">{{ message.scheduled_departure }}</span>
+							</p>
+							{% endif %}
+
 							{% if message.origin %}
 								<p>
 									<strong>ORIGIN: </strong>
@@ -56,12 +63,12 @@
 								<span>{{ message.destination }}</span>
 							</p>
 
-							{% if message.status == 'En route' %}
+							{% if message.alert_type == 'departure' %}
 								<p>
 									<strong>ACTION: </strong>
 									<span>No action needed at this time.</span>
 								</p>
-							{% elif message.status == 'Arrived' %}
+							{% elif message.alert_type == 'arrival' %}
 								{% if message.isWarehouse %}
 									<p>
 										<strong>ACTION: </strong>
@@ -77,7 +84,7 @@
 										<span>Please change the status to 'Completed' or 'Damaged'. If no action is taken within 24 hours, the shipment status will automatically change to 'Completed'.</span>
 									</p>
 								{% endif %}
-							{% elif message.status == 'Completed' %}
+							{% elif message.alert_type == 'completed' %}
 								<p>
 									<strong>ACTION: </strong>
 									<span>Shipment status has changed to 'Completed'. 
@@ -88,6 +95,11 @@
 											</li>
 										</ul>
 									</span>
+								</p>
+							{% elif message.alert_type == 'delayed' %}
+								<p>
+									<strong>ACTION: </strong>
+									<span>Please update the scheduled departure date.</span>
 								</p>
 							{% endif %}
 						</div>

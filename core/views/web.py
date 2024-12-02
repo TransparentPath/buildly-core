@@ -8,6 +8,9 @@ from django.views.generic.base import TemplateView
 from django.template import RequestContext
 from django.shortcuts import render_to_response
 
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.decorators import api_view
 from rest_framework.reverse import reverse
 
 from social_core.exceptions import AuthFailed
@@ -21,6 +24,7 @@ from social_django.utils import psa
 
 from core.exceptions import SocialAuthFailed, SocialAuthNotConfigured
 from core.utils import generate_access_tokens
+from core.email_utils import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +103,31 @@ def oauth_complete(request, backend, *args, **kwargs):
         url = setting_url(request.backend, 'LOGIN_ERROR_URL', 'LOGIN_URL')
 
     return request.backend.strategy.redirect(url)
+
+
+@api_view(['POST'])
+def send_tive_tracker_order_email(request):
+    """
+    Send email to Tive for the order specified in the request
+    """
+
+    message = request.data['message']
+
+    subject = 'Order for new devices for %s' % message['order_recipient']
+    context = {'message': message}
+    template_name = 'email/coreuser/order_tive_trackers.txt'
+    html_template_name = 'email/coreuser/order_tive_trackers.html'
+
+    send_email(
+        settings.TIVE_ORDER_TO_EMAIL_ADDRESS,
+        subject,
+        context,
+        template_name,
+        html_template_name,
+        cc_email_address=settings.TIVE_ORDER_CC_EMAIL_ADDRESSES,
+    )
+
+    return Response({'detail': 'Order for new tive devices was placed successfully on email.'}, status=status.HTTP_200_OK)
 
 
 """
