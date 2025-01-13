@@ -125,6 +125,7 @@ def send_tive_tracker_order_email(request):
         template_name,
         html_template_name,
         cc_email_address=settings.TIVE_ORDER_CC_EMAIL_ADDRESSES,
+        from_address=settings.TIVE_ORDER_FROM_EMAIL_ADDRESS,
     )
 
     return Response({'detail': 'Order for new tive devices was placed successfully on email.'}, status=status.HTTP_200_OK)
