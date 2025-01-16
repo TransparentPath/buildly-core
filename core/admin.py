@@ -60,6 +60,8 @@ class CoreUserAdmin(UserAdmin):
         'is_active',
         'user_timezone',
         'user_language',
+        'map_language',
+        'map_region',
     )
     display = 'Core User'
     list_filter = ('is_staff', 'organization')
