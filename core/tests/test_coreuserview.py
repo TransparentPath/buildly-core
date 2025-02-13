@@ -481,8 +481,6 @@ class TestCoreUserRead(object):
         'user_timezone',
         'last_gdpr_shown',
         'user_language',
-        'map_language',
-        'map_region',
     }
 
     def test_coreuser_list(self, request_factory, org_member):

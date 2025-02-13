@@ -141,8 +141,6 @@ class CoreUserSerializer(serializers.ModelSerializer):
             'user_timezone',
             'last_gdpr_shown',
             'user_language',
-            'map_language',
-            'map_region',
         )
         read_only_fields = ('core_user_uuid', 'organization')
         depth = 1
@@ -245,8 +243,6 @@ class CoreUserProfileSerializer(serializers.Serializer):
     user_timezone = serializers.CharField(required=False)
     user_language = serializers.CharField(required=False)
     last_gdpr_shown = serializers.DateTimeField(required=False)
-    map_language = serializers.CharField(required=False)
-    map_region = serializers.CharField(required=False)
 
     class Meta:
         model = CoreUser
@@ -264,8 +260,6 @@ class CoreUserProfileSerializer(serializers.Serializer):
             'user_timezone',
             'last_gdpr_shown',
             'user_language',
-            'map_language',
-            'map_region',
         )
 
     def update(self, instance, validated_data):
@@ -294,8 +288,6 @@ class CoreUserProfileSerializer(serializers.Serializer):
         instance.user_timezone = validated_data.get('user_timezone', instance.user_timezone)
         instance.user_language = validated_data.get('user_language', instance.user_language)
         instance.last_gdpr_shown = validated_data.get('last_gdpr_shown', instance.last_gdpr_shown)
-        instance.map_language = validated_data.get('map_language', instance.map_language)
-        instance.map_region = validated_data.get('map_region', instance.map_region)
         password = validated_data.get('password', None)
         if password is not None:
             instance.set_password(password)

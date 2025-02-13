@@ -307,8 +307,6 @@ class CoreUser(AbstractUser):
     user_timezone = models.CharField(blank=True, null=True, max_length=255)
     user_language = models.CharField(blank=True, null=True, max_length=255)
     last_gdpr_shown = models.DateTimeField(null=True, blank=True)
-    map_language = models.CharField(blank=True, null=True, max_length=255)
-    map_region = models.CharField(blank=True, null=True, max_length=255)
 
     REQUIRED_FIELDS = []
 
