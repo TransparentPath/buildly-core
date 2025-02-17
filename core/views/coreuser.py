@@ -135,6 +135,41 @@ class CoreUserViewSet(
         serializer = self.get_serializer(instance=user, context={'request': request})
         return Response(serializer.data)
 
+    @action(methods=['GET'], detail=False)    
+    def performance_profiler(self, request, *args, **kwargs):
+        import cProfile, pstats, io
+        from pstats import SortKey
+        pr = cProfile.Profile()
+        pr.enable()
+
+        # actual implementation of getCoreUser
+        # Use this queryset or the django-filters lib will not work
+        queryset = self.filter_queryset(self.get_queryset())
+        if not request.user.is_global_admin:
+            organization_id = request.user.organization_id
+            if request.user.is_org_admin:
+                reseller_orgs = [organization_id]
+                org = Organization.objects.get(pk=organization_id)
+                if org.is_reseller and org.reseller_customer_orgs is not None and len(org.reseller_customer_orgs) > 0:
+                    for ro in org.reseller_customer_orgs:
+                        reseller_orgs.append(ro)
+
+                queryset = queryset.filter(organization_id__in=reseller_orgs)
+            else:
+                queryset = queryset.filter(organization_id=organization_id)
+        serializer = self.get_serializer(
+            instance=queryset, context={'request': request}, many=True
+        )
+
+        pr.disable()
+        s = io.StringIO()
+        sortby = SortKey.CUMULATIVE
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        print(s.getvalue())
+
+        return Response(serializer.data)
+
     @swagger_auto_schema(
         methods=['post'],
         request_body=CoreUserInvitationSerializer,
