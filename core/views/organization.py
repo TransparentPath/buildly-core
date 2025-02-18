@@ -41,22 +41,25 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         # Use this queryset or the django-filters lib will not work
         queryset = self.filter_queryset(self.get_queryset())
+        
         if not request.user.is_global_admin:
             organization_id = request.user.organization_id
+            
             if request.user.is_org_admin:
-                organization_id = request.user.core_groups.filter(permissions=PERMISSIONS_ORG_ADMIN, is_org_level=True)[0].organization_id
+                organization_id = request.user.core_groups.filter(
+                    permissions=PERMISSIONS_ORG_ADMIN, is_org_level=True
+                )[0].organization_id
                 reseller_orgs = [organization_id]
-                str_org_id = [str(organization_id)]
-
-                # Get all reseller organization of this organization
+                
+                # Get all reseller organizations of this organization
                 org = Organization.objects.get(pk=organization_id)
-                if org.is_reseller and org.reseller_customer_orgs is not None and len(org.reseller_customer_orgs) > 0:
-                    for ro in org.reseller_customer_orgs:
-                        reseller_orgs.append(ro)
-
+                if org.is_reseller and org.reseller_customer_orgs:
+                    reseller_orgs.extend(org.reseller_customer_orgs)
+                
                 queryset = queryset.filter(pk__in=reseller_orgs)
             else:
                 queryset = queryset.filter(pk=organization_id)
+        
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     

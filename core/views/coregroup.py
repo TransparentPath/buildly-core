@@ -18,7 +18,6 @@ class CoreGroupViewSet(viewsets.ModelViewSet):
     permission_classes = (IsOrgMember,)
 
     def list(self, request, *args, **kwargs):
-
         queryset = self.get_queryset()
         if not request.user.is_global_admin:
             q1 = queryset.filter(organization=None)
@@ -26,10 +25,8 @@ class CoreGroupViewSet(viewsets.ModelViewSet):
             if request.user.is_org_admin:
                 reseller_orgs = [organization_id]
                 org = Organization.objects.get(pk=organization_id)
-                if org.is_reseller and org.reseller_customer_orgs is not None and len(org.reseller_customer_orgs) > 0:
-                    for ro in org.reseller_customer_orgs:
-                        reseller_orgs.append(ro)
-
+                if org.is_reseller and org.reseller_customer_orgs:
+                    reseller_orgs.extend(org.reseller_customer_orgs)
                 q2 = queryset.filter(organization_id__in=reseller_orgs)
             else:
                 q2 = queryset.filter(organization_id=organization_id)
