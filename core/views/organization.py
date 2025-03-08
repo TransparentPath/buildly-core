@@ -59,7 +59,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(pk__in=reseller_orgs)
             else:
                 queryset = queryset.filter(pk=organization_id)
-        
+
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
