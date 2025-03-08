@@ -185,5 +185,6 @@ SWAGGER_SETTINGS = {'DEFAULT_INFO': 'gateway.urls.swagger_info'}
 ORGANIZATION_TYPES = ['Custodian', 'Producer']
 
 # Tive tracker order settings
+TIVE_ORDER_FROM_EMAIL_ADDRESS = os.getenv('TIVE_ORDER_FROM_EMAIL_ADDRESS')
 TIVE_ORDER_TO_EMAIL_ADDRESS = os.getenv('TIVE_ORDER_TO_EMAIL_ADDRESS')
 TIVE_ORDER_CC_EMAIL_ADDRESSES = os.getenv('TIVE_ORDER_CC_EMAIL_ADDRESSES', '').split(',')

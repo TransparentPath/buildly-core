@@ -41,9 +41,8 @@ class ConsortiumViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         queryset = self.filter_queryset(self.get_queryset())
-        organization_uuid = self.request.query_params.get('organization_uuid', None)
-        # It will check if organization uuid in query param
-        if organization_uuid is not None:
+        organization_uuid = self.request.query_params.get('organization_uuid')
+        if organization_uuid:
             queryset = queryset.filter(organization_uuids__contains=[organization_uuid])
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
