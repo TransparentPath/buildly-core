@@ -37,11 +37,8 @@ INSTALLED_APPS_THIRD_PARTIES = [
     'django_filters',
     'rest_framework',
     'rest_framework.authtoken',
-    # Social auth
-    'social_django',
     # OAuth2
     'oauth2_provider',
-    'oauth2_provider_jwt',
     # swagger
     'drf_yasg',
     # health check
@@ -85,11 +82,9 @@ TEMPLATES = [
                 'django.template.context_processors.static',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'social_django.context_processors.backends',
-                'social_django.context_processors.login_redirect',
             ],
             'builtins': [  # TODO to delete?
-                'django.contrib.staticfiles.templatetags.staticfiles'
+                'django.templatetags.static'
             ],
         },
     }
@@ -112,6 +107,7 @@ DATABASES = {
     }
 }
 
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 AUTH_USER_MODEL = 'core.CoreUser'
 

@@ -1,22 +1,22 @@
 from rest_framework import mixins, viewsets
 import django_filters
-
 from oauth2_provider.models import AccessToken, Application, RefreshToken
+from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
+from django.contrib.auth import authenticate
 
-from core.serializers import (
-    AccessTokenSerializer,
-    ApplicationSerializer,
-    RefreshTokenSerializer,
-)
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.response import Response
+from rest_framework import status
+
+from core.serializers import AccessTokenSerializer, ApplicationSerializer, RefreshTokenSerializer
 from core.permissions import IsSuperUser
+from core.utils import generate_access_tokens
 
 
-class AccessTokenViewSet(
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
-    viewsets.GenericViewSet,
-):
+class AccessTokenViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                         mixins.DestroyModelMixin,
+                         viewsets.GenericViewSet):
     """
     title:
     Users' access tokens
@@ -86,12 +86,9 @@ class ApplicationViewSet(viewsets.ModelViewSet):
     serializer_class = ApplicationSerializer
 
 
-class RefreshTokenViewSet(
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
-    viewsets.GenericViewSet,
-):
+class RefreshTokenViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                          mixins.DestroyModelMixin,
+                          viewsets.GenericViewSet):
     """
     title:
     Users' refresh tokens
@@ -120,3 +117,28 @@ class RefreshTokenViewSet(
     permission_classes = (IsSuperUser,)
     queryset = RefreshToken.objects.all()
     serializer_class = RefreshTokenSerializer
+
+
+class LoginView(APIView):
+    permission_classes = [AllowAny, ]
+
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        client_id = request.data.get('client_id')
+
+        if not (username and password and client_id):
+            return Response({"error": "Username and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(request, username=username, password=password)
+
+        if user is None:
+            raise AuthenticationFailed("Invalid credentials")
+
+        # Generate JWT token
+        try:
+            token_object = generate_access_tokens(request, user, client_id)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(token_object, status=status.HTTP_200_OK)

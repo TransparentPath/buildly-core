@@ -3,7 +3,6 @@ from typing import Union
 
 from django.db import models
 from django.contrib.auth.models import Group
-from django.contrib.postgres.fields import JSONField
 from django.core.exceptions import ValidationError
 
 try:
@@ -18,7 +17,7 @@ DEFAULT_PROGRAM_NAME = 'Default program'
 
 class Internationalization(models.Model):
     language = models.CharField("Language", blank=True, null=True, max_length=100)
-    language_file = JSONField()
+    language_file = models.JSONField()
     create_date = models.DateTimeField(null=True, blank=True)
     edit_date = models.DateTimeField(null=True, blank=True)
 
@@ -323,7 +322,7 @@ class WorkflowLevel2Sort(models.Model):
     workflowlevel2_pk = models.UUIDField(
         "UUID to be Sorted", default='00000000-0000-4000-8000-000000000000'
     )
-    sort_array = JSONField(
+    sort_array = models.JSONField(
         null=True, blank=True, help_text="Sorted JSON array of workflow levels"
     )
     create_date = models.DateTimeField(null=True, blank=True)
