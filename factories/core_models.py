@@ -1,5 +1,6 @@
 from django.template.defaultfilters import slugify
-from factory import DjangoModelFactory, SubFactory, Faker, lazy_attribute
+from factory import SubFactory, Faker, LazyAttribute
+from factory.django import DjangoModelFactory
 
 from core.models import (
     CoreUser as CoreUserM,
@@ -33,8 +34,8 @@ class CoreUser(DjangoModelFactory):
     organization = SubFactory(Organization)
     first_name = Faker('name')
     last_name = Faker('name')
-    username = lazy_attribute(lambda o: slugify(o.first_name + '.' + o.last_name))
-    email = lazy_attribute(lambda o: o.username + "@example.com")
+    username = LazyAttribute(lambda o: slugify(o.first_name + '.' + o.last_name))
+    email = LazyAttribute(lambda o: o.username + "@example.com")
 
 
 class LogicModule(DjangoModelFactory):
