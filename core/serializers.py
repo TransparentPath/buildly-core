@@ -199,10 +199,12 @@ class CoreUserWritableSerializer(CoreUserSerializer):
                 + str(organization.organization_uuid)
                 + '&unit_of_measure_for=Language'
             )
-            default_timezone = requests.get(uom_timezone_url).json()[0]
-            default_language = requests.get(uom_language_url).json()[0]
-            coreuser.user_timezone = default_timezone['unit_of_measure']
-            coreuser.user_language = default_language['unit_of_measure']
+            default_timezone_response = requests.get(uom_timezone_url).json()
+            default_language_response = requests.get(uom_language_url).json()
+            default_timezone = default_timezone_response[0]['unit_of_measure'] if len(default_timezone_response) > 0 else 'America/Los_Angeles'
+            default_language = default_language_response[0]['unit_of_measure'] if len(default_language_response) > 0 else 'English'
+            coreuser.user_timezone = default_timezone
+            coreuser.user_language = default_language
 
         coreuser.core_groups.set(core_groups)
         coreuser.save()
@@ -353,7 +355,7 @@ class CoreUserResetPasswordSerializer(serializers.Serializer):
                     if tpl.template_html
                     else None
                 )
-                count += send_email_body(email, tpl.subject, text_content, html_content)
+                count += send_email_body(email, tpl.subject, text_content, html_content, [], settings.SUPPORT_EMAIL_ADDRESS, settings.DEFAULT_FROM_EMAIL)
                 continue
 
             # default subject and templates

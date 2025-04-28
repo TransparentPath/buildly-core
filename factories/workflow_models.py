@@ -1,4 +1,5 @@
-from factory import DjangoModelFactory, SubFactory
+from factory import SubFactory
+from factory.django import DjangoModelFactory
 
 from workflow.models import (
     WorkflowLevel1 as WorkflowLevel1M,
