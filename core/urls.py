@@ -1,4 +1,6 @@
 from django.urls import include, path, re_path
+from django.views.static import serve
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework import routers
@@ -23,6 +25,7 @@ router.register(r'consortium', views.ConsortiumViewSet)
 router.register(r'organization_type', views.OrganizationTypeViewSet)
 
 urlpatterns = [
+    re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
     path('', IndexView.as_view(), name='index'),
     path('admin/', admin.site.urls),
     path('health_check/', include('health_check.urls')),
