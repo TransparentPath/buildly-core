@@ -4,7 +4,7 @@ services:
 
   postgres_buildly:
     container_name: postgres_buildly
-    image: postgres:9.6
+    image: postgres:15
     environment:
       POSTGRES_DB: buildly
       POSTGRES_USER: root
@@ -30,7 +30,7 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: "buildly.settings.production"
       ALLOWED_HOSTS: "*"
-      CORS_ORIGIN_WHITELIST: "*"
+      CORS_ORIGIN_WHITELIST: http://localhost,https://localhost,http://127.0.0.1,https://127.0.0.1,http://0.0.0.0,https://0.0.0.0
       DATABASE_ENGINE: "postgresql"
       DATABASE_NAME: "buildly"
       DATABASE_USER: "root"
@@ -54,10 +54,6 @@ services:
         MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALFc9NFZaOaSwUMPNektbtJqEjYZ6IRB
         qhqvJu1hKPYn9HYd75c0gIDYHJ9lb7QwQvg44aO27104rDK0xSstzL0CAwEAAQ==
         -----END PUBLIC KEY-----
-      SOCIAL_AUTH_GITHUB_REDIRECT_URL: "https://localhost:8000/complete/github"
-      SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URL: "https://localhost:8000/complete/google-oauth2"
-      SOCIAL_AUTH_LOGIN_REDIRECT_URL: "http://localhost:8080/"
-      SOCIAL_AUTH_MICROSOFT_GRAPH_REDIRECT_URL: "https://localhost:8000/complete/microsoft-graph"
       ACCESS_TOKEN_EXPIRE_SECONDS: "86400"
       SECRET_KEY: "ek*)b=mtcc7q1cym@oox(lyrz1ncz-(w+(#&u7l-&)7a8wv#_k"
       OAUTH_CLIENT_ID: "wkXLlC9h3k0jxIx7oLllxpFVU89Dxgi7O8FYZyfX"

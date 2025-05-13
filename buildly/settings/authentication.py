@@ -5,7 +5,6 @@ from django_auth_ldap.config import LDAPSearch
 
 MIDDLEWARE_AUTHENTICATION = [
     'oauth2_provider.middleware.OAuth2TokenMiddleware',
-    'social_django.middleware.SocialAuthExceptionMiddleware',
 ]
 
 MIDDLEWARE = MIDDLEWARE_DJANGO + MIDDLEWARE_AUTHENTICATION
@@ -19,9 +18,6 @@ if AUTH_LDAP_ENABLE:
     AUTHENTICATION_LDAP_BACKEND.append('django_auth_ldap.backend.LDAPBackend')
 
 AUTHENTICATION_BACKENDS = [
-    'social_core.backends.github.GithubOAuth2',
-    'social_core.backends.google.GoogleOAuth2',
-    'social_core.backends.microsoft.MicrosoftOAuth2',
     'django.contrib.auth.backends.ModelBackend',
     'oauth2_provider.backends.OAuth2Backend',
 ]
@@ -31,7 +27,6 @@ AUTHENTICATION_BACKENDS = AUTHENTICATION_LDAP_BACKEND + AUTHENTICATION_BACKENDS
 # Rest Framework OAuth2 and JWT
 REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] += [
     'oauth2_provider.contrib.rest_framework.OAuth2Authentication',
-    'oauth2_provider_jwt.authentication.JWTAuthentication',
 ]
 
 # Auth Application
@@ -72,55 +67,8 @@ for (
     if os.getenv(password_validator_env_var, 'True') == 'True':
         AUTH_PASSWORD_VALIDATORS.append(password_validator)
 
-# Social Auth
 LOGIN_URL = os.getenv('LOGIN_URL', FRONTEND_URL)
 LOGIN_REDIRECT_URL = '/'
-SOCIAL_AUTH_URL_NAMESPACE = 'social'
-SOCIAL_AUTH_POSTGRES_JSONFIELD = True
-
-SOCIAL_AUTH_REDIRECT_IS_HTTPS = (
-    True if os.getenv('SOCIAL_AUTH_REDIRECT_IS_HTTPS') == 'True' else False
-)
-SOCIAL_AUTH_LOGIN_REDIRECT_URLS = {
-    'github': os.getenv('SOCIAL_AUTH_GITHUB_REDIRECT_URL', None),
-    'google-oauth2': os.getenv('SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URL', None),
-    'microsoft-graph': os.getenv('SOCIAL_AUTH_MICROSOFT_GRAPH_REDIRECT_URL', None),
-}
-
-SOCIAL_AUTH_PIPELINE = (
-    'social_core.pipeline.social_auth.social_details',
-    'social_core.pipeline.social_auth.social_uid',
-    'social_core.pipeline.social_auth.social_user',
-    'social_core.pipeline.user.create_user',
-    'core.auth_pipeline.create_organization',
-    'social_core.pipeline.social_auth.associate_user',
-    'social_core.pipeline.social_auth.load_extra_data',
-    'social_core.pipeline.user.user_details',
-)
-
-# Github social auth
-SOCIAL_AUTH_GITHUB_KEY = os.getenv('SOCIAL_AUTH_GITHUB_KEY', '')
-SOCIAL_AUTH_GITHUB_SECRET = os.getenv('SOCIAL_AUTH_GITHUB_SECRET', '')
-
-# Google social auth
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('SOCIAL_AUTH_GOOGLE_OAUTH2_KEY', '')
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET', '')
-
-# Microsoft social auth
-SOCIAL_AUTH_MICROSOFT_GRAPH_KEY = os.getenv('SOCIAL_AUTH_MICROSOFT_GRAPH_KEY', '')
-SOCIAL_AUTH_MICROSOFT_GRAPH_SECRET = os.getenv('SOCIAL_AUTH_MICROSOFT_GRAPH_SECRET', '')
-
-
-# Whitelist of domains allowed to login via social auths
-# i.e. ['example.com', 'buildly.io','treeaid.org']
-if os.getenv('SOCIAL_AUTH_GOOGLE_OAUTH2_WHITELISTED_DOMAINS'):
-    SOCIAL_AUTH_GOOGLE_OAUTH2_WHITELISTED_DOMAINS = os.getenv(
-        'SOCIAL_AUTH_GOOGLE_OAUTH2_WHITELISTED_DOMAINS'
-    ).split(',')
-if os.getenv('SOCIAL_AUTH_MICROSOFT_WHITELISTED_DOMAINS'):
-    SOCIAL_AUTH_GOOGLE_MICROSOFT_DOMAINS = os.getenv(
-        'SOCIAL_AUTH_MICROSOFT_WHITELISTED_DOMAINS'
-    ).split(',')
 
 # oauth2 settings
 OAUTH2_PROVIDER = {

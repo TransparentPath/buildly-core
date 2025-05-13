@@ -1,7 +1,7 @@
 import uuid
 
 from django.contrib.auth.models import AbstractUser
-from django.contrib.postgres.fields import ArrayField, JSONField
+from django.contrib.postgres.fields import ArrayField
 from django.contrib.sites.models import Site
 from django.db import models
 from django.utils import timezone
@@ -300,8 +300,8 @@ class CoreUser(AbstractUser):
     privacy_disclaimer_accepted = models.BooleanField(default=False)
     create_date = models.DateTimeField(default=timezone.now)
     edit_date = models.DateTimeField(null=True, blank=True)
-    geo_alert_preferences = JSONField(blank=True, null=True, default=get_preferences_default)
-    env_alert_preferences = JSONField(blank=True, null=True, default=get_preferences_default)
+    geo_alert_preferences = models.JSONField(blank=True, null=True, default=get_preferences_default)
+    env_alert_preferences = models.JSONField(blank=True, null=True, default=get_preferences_default)
     sms_number = models.CharField(blank=True, null=True, max_length=15)
     whatsApp_number = models.CharField(blank=True, null=True, max_length=15)
     user_timezone = models.CharField(blank=True, null=True, max_length=255)
@@ -398,7 +398,8 @@ class LogicModule(models.Model):
     endpoint = models.CharField(blank=True, null=True, max_length=255)
     endpoint_name = models.CharField(blank=True, null=True, max_length=255)
     docs_endpoint = models.CharField(blank=True, null=True, max_length=255)
-    api_specification = JSONField(blank=True, null=True)
+    api_specification = models.JSONField(blank=True, null=True)
+    swagger_version = models.CharField(max_length=50, null=True, blank=True)
     core_groups = models.ManyToManyField(
         CoreGroup,
         verbose_name='Logic Module groups',

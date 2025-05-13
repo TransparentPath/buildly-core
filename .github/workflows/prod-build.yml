@@ -70,14 +70,6 @@ jobs:
     - name: Push to Google Artifact Registry
       run: docker push $IMAGE_NAME:latest
 
-    # Send message on Slack
-    - name: Slack Notification
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_MESSAGE: 'Production Docker Image of buildly core pushed to Google Container Registry Successfully'
-        MSG_MINIMAL: true
-
     # Send email alert
     - name: Email Alert
       uses: dawidd6/action-send-mail@v3
@@ -90,3 +82,13 @@ jobs:
         to: ${{ secrets.RECIPIENT_EMAIL }}
         from: ${{ secrets.SENDER_EMAIL }}
         body: Production Docker Image of buildly core pushed to Google Container Registry Successfully
+
+    - name: Deploy on Kapstan
+      id: Kapstan
+      uses: kapstan-io/deployment-action@latest
+      with: 
+        application_name: buildly-core
+        image_repository_name: ${{ env.IMAGE_NAME }}
+        image_tag: latest
+        kapstan_api_key: ${{ secrets.PROD_KAPSTAN_KEY }}
+        wait_for_deployment: false
