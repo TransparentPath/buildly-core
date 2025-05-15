@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework import routers
 from core import views
-from core.views.web import IndexView, send_tive_tracker_order_email
+from core.views.web import IndexView, send_tive_tracker_order_email, send_tracker_turn_off_email
 
 admin.autodiscover()
 admin.site.site_header = 'Buildly Administration'
@@ -33,6 +33,7 @@ urlpatterns = [
     path('', include('gateway.urls')),
     path('', include('workflow.urls')),
     path('send_tive_tracker_order_email/', send_tive_tracker_order_email, name='send_tive_tracker_order_email'),
+    path('send_tracker_turn_off_email/', send_tracker_turn_off_email, name='send_tracker_turn_off_email'),
     path('oauth/login/', views.LoginView.as_view()),
 ]
 

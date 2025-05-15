@@ -59,20 +59,20 @@ def send_tive_tracker_order_email(request):
 
 
 @api_view(['POST'])
-def send_tive_tracker_order_email(request):
+def send_tracker_turn_off_email(request):
     """
-    Send email to Tive for the order specified in the request
+    Send email to Tive to turn off the tracker specified in the request
     """
 
     message = request.data['message']
 
-    subject = 'Order for new devices for %s' % message['order_recipient']
+    subject = 'Turn off devices'
     context = {'message': message}
-    template_name = 'email/coreuser/order_tive_trackers.txt'
-    html_template_name = 'email/coreuser/order_tive_trackers.html'
+    template_name = 'email/coreuser/turn_off_tive_tracker.txt'
+    html_template_name = 'email/coreuser/turn_off_tive_tracker.html'
 
     send_email(
-        settings.TIVE_ORDER_TO_EMAIL_ADDRESS,
+        settings.TIVE_TURN_OFF_EMAIL_ADDRESS,
         subject,
         context,
         template_name,
@@ -81,7 +81,7 @@ def send_tive_tracker_order_email(request):
         from_address=settings.TIVE_ORDER_FROM_EMAIL_ADDRESS,
     )
 
-    return Response({'detail': 'Order for new tive devices was placed successfully on email.'}, status=status.HTTP_200_OK)
+    return Response({'detail': 'Email to turn off device sent successfully.'}, status=status.HTTP_200_OK)
 
 
 """
