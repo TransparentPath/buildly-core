@@ -102,10 +102,6 @@ The following table lists the configurable parameters of buildly and their defau
 | `OAUTH_CLIENT_SECRET`               | Used in combination with OAUTH_CLIENT_ID to create OAuth2 password grant | None |
 | `PASSWORD_MINIMUM_LENGTH`           | The minimum length of passwords      | `6` |
 | `SECRET_KEY`                        | Used to provide cryptographic signing, and should be set to a unique, unpredictable value | None |
-| `SOCIAL_AUTH_GITHUB_REDIRECT_URL`   | The redirect URL for GitHub Social auth  | None                                |
-| `SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URL`  | The redirect URL for Google Social auth  | None                          |
-| `SOCIAL_AUTH_LOGIN_REDIRECT_URL`    | Redirect the user once the auth process ended successfully | None                              |
-| `SOCIAL_AUTH_MICROSOFT_GRAPH_REDIRECT_URL` | The redirect URL for Microsoft graph Social auth | None                 |
 | `SUPER_USER_PASSWORD`               | Used to define the super user password when it's created for the first time | `admin` in Debug mode or None |
 | `USE_PASSWORD_MINIMUM_LENGTH_VALIDATOR`   | Checks whether the password meets a minimum length | True       |
 | `USE_PASSWORD_USER_ATTRIBUTE_SIMILARITY_VALIDATOR`  | Checks the similarity between the password and a set of attributes of the user | True |

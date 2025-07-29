@@ -45,7 +45,7 @@ class TestApplicationCreateView:
         data = {
             'client_type': Application.CLIENT_PUBLIC,
             'authorization_grant_type': Application.GRANT_PASSWORD,
-            'name': Faker('name').generate(),
+            'name': Faker('name'),
         }
 
         response = auth_superuser_api_client.post(self.ENDPOINT_BASE_URL, data)
@@ -59,7 +59,7 @@ class TestApplicationCreateView:
         data = {
             'client_type': Application.CLIENT_PUBLIC,
             'authorization_grant_type': Application.GRANT_PASSWORD,
-            'name': Faker('name').generate(),
+            'name': Faker('name'),
         }
 
         response = auth_api_client.post(self.ENDPOINT_BASE_URL, data)
@@ -115,7 +115,7 @@ class TestApplicationUpdateView:
         data = {
             'client_type': Application.CLIENT_PUBLIC,
             'authorization_grant_type': Application.GRANT_PASSWORD,
-            'name': Faker('name').generate(),
+            'name': Faker('name'),
         }
         response = auth_superuser_api_client.put(url, data)
         assert response.status_code == 200
@@ -130,7 +130,7 @@ class TestApplicationUpdateView:
         data = {
             'client_type': Application.CLIENT_PUBLIC,
             'authorization_grant_type': Application.GRANT_PASSWORD,
-            'name': Faker('name').generate(),
+            'name': Faker('name'),
         }
         response = auth_api_client.put(url, data)
         assert response.status_code == 403

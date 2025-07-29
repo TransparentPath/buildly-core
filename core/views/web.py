@@ -6,23 +6,13 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import TemplateView
 from django.template import RequestContext
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.reverse import reverse
 
-from social_core.exceptions import AuthFailed
-from social_core.utils import (
-    partial_pipeline_data,
-    setting_url,
-    user_is_active,
-    user_is_authenticated,
-)
-from social_django.utils import psa
-
-from core.exceptions import SocialAuthFailed, SocialAuthNotConfigured
 from core.utils import generate_access_tokens
 from core.email_utils import send_email
 
@@ -42,67 +32,56 @@ class IndexView(TemplateView):
         return context
 
 
-@never_cache
-@csrf_exempt
-@psa()
-def oauth_complete(request, backend, *args, **kwargs):
+@api_view(['POST'])
+def send_tive_tracker_order_email(request):
     """
-    Authentication complete view used for Social Auth
+    Send email to Tive for the order specified in the request
     """
 
-    code = request.GET.get('code', None)
-    if code is None:
-        raise SocialAuthFailed('Authorization code has to be provided.')
+    message = request.data['message']
 
-    request.backend.data['code'] = code
-    is_authenticated = user_is_authenticated(request.user)
-    user = request.user if is_authenticated else None
+    subject = 'Order for new devices for %s' % message['order_recipient']
+    context = {'message': message}
+    template_name = 'email/coreuser/order_tive_trackers.txt'
+    html_template_name = 'email/coreuser/order_tive_trackers.html'
 
-    partial = partial_pipeline_data(request.backend, user, *args, **kwargs)
-    if partial:
-        user = request.backend.continue_pipeline(partial)
-        # clean partial data after usage
-        request.backend.strategy.clean_partial_pipeline(partial.token)
-    else:
-        # check if social auth is configured properly
-        if backend not in settings.SOCIAL_AUTH_LOGIN_REDIRECT_URLS:
-            raise SocialAuthNotConfigured(f'The backend {backend} is not supported.')
-        elif not settings.SOCIAL_AUTH_LOGIN_REDIRECT_URLS.get(backend):
-            raise SocialAuthNotConfigured(
-                f'A redirect URL for the backend {backend} was not defined.'
-            )
+    send_email(
+        settings.TIVE_ORDER_TO_EMAIL_ADDRESS,
+        subject,
+        context,
+        template_name,
+        html_template_name,
+        cc_email_address=settings.TIVE_ORDER_CC_EMAIL_ADDRESSES,
+        from_address=settings.TIVE_ORDER_FROM_EMAIL_ADDRESS,
+    )
 
-        # prepare request to validate code
-        data = request.backend.strategy.request_data()
-        data['code'] = code
-        redirect_uri = settings.SOCIAL_AUTH_LOGIN_REDIRECT_URLS.get(backend)
-        request.backend.redirect_uri = redirect_uri
-        request.backend.STATE_PARAMETER = False
-        request.backend.REDIRECT_STATE = False
+    return Response({'detail': 'Order for new tive devices was placed successfully on email.'}, status=status.HTTP_200_OK)
 
-        try:
-            # validate code / trigger pipeline and return a user
-            user = request.backend.complete(user=user, *args, **kwargs)
-        except AuthFailed as e:
-            raise SocialAuthFailed(e.args[0])
 
-    if is_authenticated:
-        # generate JWT/Bearer Token
-        tokens = generate_access_tokens(request, user)
-        return JsonResponse(data=tokens, status=200)
-    elif user:
-        if user_is_active(user):
-            # generate JWT/Bearer Token
-            tokens = generate_access_tokens(request, user)
-            return JsonResponse(data=tokens, status=200)
-        else:
-            url = setting_url(
-                request.backend, 'INACTIVE_USER_URL', 'LOGIN_ERROR_URL', 'LOGIN_URL'
-            )
-    else:
-        url = setting_url(request.backend, 'LOGIN_ERROR_URL', 'LOGIN_URL')
+@api_view(['POST'])
+def send_tracker_turn_off_email(request):
+    """
+    Send email to Tive to turn off the tracker specified in the request
+    """
 
-    return request.backend.strategy.redirect(url)
+    message = request.data['message']
+
+    subject = 'Turn off devices'
+    context = {'message': message}
+    template_name = 'email/coreuser/turn_off_tive_tracker.txt'
+    html_template_name = 'email/coreuser/turn_off_tive_tracker.html'
+
+    send_email(
+        settings.TIVE_TURN_OFF_EMAIL_ADDRESS,
+        subject,
+        context,
+        template_name,
+        html_template_name,
+        cc_email_address=settings.TIVE_ORDER_CC_EMAIL_ADDRESSES,
+        from_address=settings.TIVE_ORDER_FROM_EMAIL_ADDRESS,
+    )
+
+    return Response({'detail': 'Email to turn off device sent successfully.'}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -139,6 +118,6 @@ ERROR TEMPLATES and views
 def handler404(request, exception):
     context = RequestContext(request)
     err_code = 404 + ": " + exception
-    response = render_to_response('404.html', {"code": err_code}, context)
+    response = render(request, '404.html', {"code": err_code}, context)
     response.status_code = 404
     return response

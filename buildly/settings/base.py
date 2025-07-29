@@ -21,6 +21,11 @@ STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
+STATICFILES_FINDERS = (
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+)
+
 
 INSTALLED_APPS_DJANGO = [
     'django.contrib.admin',
@@ -37,11 +42,8 @@ INSTALLED_APPS_THIRD_PARTIES = [
     'django_filters',
     'rest_framework',
     'rest_framework.authtoken',
-    # Social auth
-    'social_django',
     # OAuth2
     'oauth2_provider',
-    'oauth2_provider_jwt',
     # swagger
     'drf_yasg',
     # health check
@@ -85,11 +87,9 @@ TEMPLATES = [
                 'django.template.context_processors.static',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'social_django.context_processors.backends',
-                'social_django.context_processors.login_redirect',
             ],
             'builtins': [  # TODO to delete?
-                'django.contrib.staticfiles.templatetags.staticfiles'
+                'django.templatetags.static'
             ],
         },
     }
@@ -112,6 +112,7 @@ DATABASES = {
     }
 }
 
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 AUTH_USER_MODEL = 'core.CoreUser'
 
@@ -188,3 +189,4 @@ ORGANIZATION_TYPES = ['Custodian', 'Producer']
 TIVE_ORDER_FROM_EMAIL_ADDRESS = os.getenv('TIVE_ORDER_FROM_EMAIL_ADDRESS')
 TIVE_ORDER_TO_EMAIL_ADDRESS = os.getenv('TIVE_ORDER_TO_EMAIL_ADDRESS')
 TIVE_ORDER_CC_EMAIL_ADDRESSES = os.getenv('TIVE_ORDER_CC_EMAIL_ADDRESSES', '').split(',')
+TIVE_TURN_OFF_EMAIL_ADDRESS = os.getenv('TIVE_TURN_OFF_EMAIL_ADDRESS')

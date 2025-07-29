@@ -8,12 +8,3 @@ class BuildlyError(Exception):
         self.status = status
         self.content_type = 'application/json'
 
-
-class SocialAuthFailed(BuildlyError):
-    def __init__(self, msg):
-        super(SocialAuthFailed, self).__init__(msg, 400)
-
-
-class SocialAuthNotConfigured(BuildlyError):
-    def __init__(self, msg):
-        super(SocialAuthNotConfigured, self).__init__(msg, 500)
