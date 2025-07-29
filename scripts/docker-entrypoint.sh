@@ -26,4 +26,4 @@ echo $(date -u) "- Collect Static"
 python manage.py collectstatic --no-input
 
 echo $(date -u) "- Running the server"
-gunicorn -b 0.0.0.0:8080 buildly.wsgi --limit-request-line 8190
+gunicorn -b 0.0.0.0:8080 buildly.wsgi --limit-request-line 0
