@@ -196,6 +196,7 @@ class Organization(models.Model):
         null=True,
         help_text="All customer organizations associated with this reseller.",
     )
+    enable_tilt = models.BooleanField('Enable Tilt', default=False)
 
     class Meta:
         ordering = ('name',)
