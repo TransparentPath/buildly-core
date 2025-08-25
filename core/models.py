@@ -176,8 +176,12 @@ class Organization(models.Model):
     default_min_humidity = models.FloatField(max_length=20, blank=True, null=True, default=0.0)
     default_shock = models.FloatField(max_length=20, blank=True, null=True, default=4.0)
     default_light = models.FloatField(max_length=20, blank=True, null=True, default=5.0)
-    default_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
-    default_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
+    default_pre_transit_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
+    default_pre_transit_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
+    default_transit_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
+    default_transit_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
+    default_post_transit_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
+    default_post_transit_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
     alerts_to_suppress = ArrayField(
         models.CharField("Alert type to suppress", max_length=20, null=True, blank=True),
         null=True,
@@ -192,6 +196,7 @@ class Organization(models.Model):
         null=True,
         help_text="All customer organizations associated with this reseller.",
     )
+    enable_tilt = models.BooleanField('Enable Tilt', default=False)
 
     class Meta:
         ordering = ('name',)
