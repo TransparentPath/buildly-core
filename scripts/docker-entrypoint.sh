@@ -5,7 +5,7 @@ set -e
 bash scripts/tcp-port-wait.sh $DATABASE_HOST $DATABASE_PORT
 
 echo $(date -u) "- Migrating"
-python manage.py makemigrations
+python manage.py makemigrations --noinput
 python manage.py migrate
 
 # export env variable from file
