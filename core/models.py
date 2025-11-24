@@ -178,8 +178,8 @@ class Organization(models.Model):
     default_light = models.FloatField(max_length=20, blank=True, null=True, default=5.0)
     default_pre_transit_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
     default_pre_transit_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
-    default_transit_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
-    default_transit_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=20)
+    default_transit_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
+    default_transit_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
     default_post_transit_transmission_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
     default_post_transit_measurement_interval = models.IntegerField('Interval in minutes', blank=True, null=True, default=120)
     alerts_to_suppress = ArrayField(
