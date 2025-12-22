@@ -84,6 +84,32 @@ def send_tracker_turn_off_email(request):
     return Response({'detail': 'Email to turn off device sent successfully.'}, status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+def send_tive_tracker_order_email(request):
+    """
+    Send email to Tive for the order specified in the request
+    """
+
+    message = request.data['message']
+
+    subject = 'Order for new devices for %s' % message['order_recipient']
+    context = {'message': message}
+    template_name = 'email/coreuser/order_tive_trackers.txt'
+    html_template_name = 'email/coreuser/order_tive_trackers.html'
+
+    send_email(
+        settings.TIVE_ORDER_TO_EMAIL_ADDRESS,
+        subject,
+        context,
+        template_name,
+        html_template_name,
+        cc_email_address=settings.TIVE_ORDER_CC_EMAIL_ADDRESSES,
+        from_address=settings.TIVE_ORDER_FROM_EMAIL_ADDRESS,
+    )
+
+    return Response({'detail': 'Order for new tive devices was placed successfully on email.'}, status=status.HTTP_200_OK)
+
+
 """
 ERROR TEMPLATES and views
 """
