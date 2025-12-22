@@ -43,7 +43,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         TARGET_REPO: "TransparentPath/ops"
-        TARGET_FILE: "kapstan/Dev/buildy-core/templates/manifest.yaml"
+        TARGET_FILE: "kapstan/Dev/buildly-core/templates/manifest.yaml"
         TARGET_BRANCH: "master"
         IMAGE_TAG: "build-${{ github.run_number }}"
       run: |
@@ -54,9 +54,9 @@ jobs:
         cd ops-repo
         git checkout $TARGET_BRANCH
 
-        # Update only the main buildy-core container image
-        # This sed command finds the line with buildy-core image and updates only that occurrence
-        sed -i.bak "s|image: us-docker.pkg.dev/spry-bricolage-298920/gcr.io/dev/buildy-core:.*|image: $IMAGE_NAME:$IMAGE_TAG|" $TARGET_FILE
+        # Update only the main buildly-core container image
+        # This sed command finds the line with buildly-core image and updates only that occurrence
+        sed -i.bak "s|image: us-docker.pkg.dev/spry-bricolage-298920/gcr.io/dev/buildly-core:.*|image: $IMAGE_NAME:$IMAGE_TAG|" $TARGET_FILE
 
         # Verify the change was made
         if grep -q "$IMAGE_NAME:$IMAGE_TAG" $TARGET_FILE; then
@@ -75,7 +75,7 @@ jobs:
         if git diff --staged --quiet; then
           echo "ℹ️  No changes to commit - manifest already up to date"
         else
-          git commit -m "🚀 Deploy buildy-core:$IMAGE_TAG to Dev
+          git commit -m "🚀 Deploy buildly-core:$IMAGE_TAG to Dev
 
         Automated deployment from buildly_core repository
         Source commit: ${{ github.sha }}
