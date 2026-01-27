@@ -65,10 +65,59 @@ jobs:
         gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
     - name: Build docker image
-      run: docker build -t $IMAGE_NAME:latest .
+      run: docker build -t $IMAGE_NAME:build-${{ github.run_number }} .
   
     - name: Push to Google Artifact Registry
-      run: docker push $IMAGE_NAME:latest
+      run: docker push $IMAGE_NAME:build-${{ github.run_number }}
+
+    - name: Update Kubernetes manifest in ops repo
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        TARGET_REPO: "TransparentPath/ops"
+        TARGET_FILE: "kapstan/Production/buildly-core/templates/manifest.yaml"
+        TARGET_BRANCH: "master"
+        IMAGE_TAG: "build-${{ github.run_number }}"
+      run: |
+        echo "🚀 Updating Production manifest to use $IMAGE_NAME:$IMAGE_TAG"
+
+        # Clone the ops repository
+        git clone https://x-access-token:$GITHUB_TOKEN@github.com/$TARGET_REPO.git ops-repo
+        cd ops-repo
+        git checkout $TARGET_BRANCH
+
+        # Update only the main buildly-core container image
+        # This sed command finds the line with buildly-core image and updates only that occurrence
+        sed -i.bak "s|image: us-docker.pkg.dev/spry-bricolage-298920/gcr.io/prod/buildly-core:.*|image: $IMAGE_NAME:$IMAGE_TAG|" $TARGET_FILE
+
+        # Verify the change was made
+        if grep -q "$IMAGE_NAME:$IMAGE_TAG" $TARGET_FILE; then
+          echo "✅ Image tag updated successfully in manifest"
+        else
+          echo "❌ Failed to update image tag in manifest"
+          exit 1
+        fi
+
+        # Configure git
+        git config user.name "Buildly Core CI"
+        git config user.email "ci-bot@transparentpath.com"
+
+        # Commit and push changes
+        git add $TARGET_FILE
+        if git diff --staged --quiet; then
+          echo "ℹ️  No changes to commit - manifest already up to date"
+        else
+          git commit -m "🚀 Deploy buildly-core:$IMAGE_TAG to Production
+
+        Automated deployment from buildly_core repository
+        Source commit: ${{ github.sha }}
+        Triggered by: ${{ github.actor }}
+        Build number: ${{ github.run_number }}
+        Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          git push origin $TARGET_BRANCH
+          echo "✅ Manifest updated and pushed successfully"
+          echo "🔄 Kubernetes pods will auto-refresh with new image"
+        fi
 
     # Send email alert
     - name: Email Alert
