@@ -35,6 +35,7 @@ urlpatterns = [
     path('send_tive_tracker_order_email/', send_tive_tracker_order_email, name='send_tive_tracker_order_email'),
     path('send_tracker_turn_off_email/', send_tracker_turn_off_email, name='send_tracker_turn_off_email'),
     path('oauth/login/', views.LoginView.as_view()),
+    path('oauth/refresh/', views.RefreshView.as_view()),
 ]
 
 urlpatterns += staticfiles_urlpatterns() + router.urls
