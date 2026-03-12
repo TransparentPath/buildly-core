@@ -62,6 +62,12 @@ def generate_access_tokens(request: WSGIRequest, user: User, client_id=None):
         raise Exception("Invalid client credentials.")
 
     token = bearer_token.create_token(request, refresh_token=True)
+    # `oauthlib` defaults to 3600s unless explicitly overridden. Since this code
+    # path bypasses DOT's standard token endpoint, we must enforce the configured
+    # expiry here (so both the stored AccessToken.expires and JWT `exp` match).
+    configured_expires_in = settings.OAUTH2_PROVIDER.get('ACCESS_TOKEN_EXPIRE_SECONDS')
+    if configured_expires_in is not None:
+        token['expires_in'] = int(configured_expires_in)
     bearer_token.request_validator.save_bearer_token(token, request)
 
     # generate JWT

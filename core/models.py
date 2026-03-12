@@ -197,6 +197,7 @@ class Organization(models.Model):
         help_text="All customer organizations associated with this reseller.",
     )
     enable_tilt = models.BooleanField('Enable Tilt', default=False)
+    default_platform = models.CharField("Default Sensor Platform", max_length=255, blank=True, default="Tive")
 
     class Meta:
         ordering = ('name',)
