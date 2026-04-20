@@ -46,6 +46,8 @@ def test_org_serializer(request_factory, org):
         'alerts_to_suppress',
         'is_reseller',
         'reseller_customer_orgs',
+        'enable_tilt',
+        'default_platform',
     ]
     assert set(data.keys()) == set(keys)
 

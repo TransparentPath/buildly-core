@@ -142,3 +142,32 @@ class LoginView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(token_object, status=status.HTTP_200_OK)
+
+
+class RefreshView(APIView):
+    permission_classes = [AllowAny, ]
+
+    def post(self, request):
+        refresh_token = request.data.get('refresh_token')
+        client_id = request.data.get('client_id')
+
+        if not refresh_token:
+            return Response({"error": "Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        refresh_token_object = RefreshToken.objects.get(token=refresh_token)
+
+        if not refresh_token_object:
+            return Response({"error": "Refresh token not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = refresh_token_object.user
+
+        if not user:
+            return Response({"error": "User not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate JWT token
+        try:
+            token_object = generate_access_tokens(request, user, client_id)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(token_object, status=status.HTTP_200_OK)
