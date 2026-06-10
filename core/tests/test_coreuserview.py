@@ -19,6 +19,7 @@ from core.tests.fixtures import (
     org_member,
     org,
     reset_password_request,
+    valid_reset_code,
 )
 
 
@@ -417,34 +418,86 @@ class TestResetPassword(object):
         assert len(mail.outbox) == 1
         assert mail.outbox[0].to == ['delivery.actual@example.com']
 
-    def test_reset_password_check(self, request_factory, reset_password_request):
-        user, uid, token = reset_password_request
-        data = {'uid': uid, 'token': token}
+    def test_reset_password_check_valid_code(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {'email': user.username, 'code': code_obj.code}
         request = request_factory.post(reverse('coreuser-reset-password-check'), data)
         response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
         assert response.status_code == 200
-        assert response.data['success'] is True
+        assert response.data['is_valid'] is True
+        assert response.data['message'] == 'Reset code verified and found valid'
+        # read-only — code must not be marked used
+        code_obj.refresh_from_db()
+        assert code_obj.is_used is False
 
-    def test_reset_password_check_expired(
-        self, request_factory, reset_password_request
-    ):
-        user, uid, token = reset_password_request
-        data = {'uid': uid, 'token': token}
-        mock_date = date.today() + timedelta(
-            int(settings.PASSWORD_RESET_TIMEOUT_DAYS) + 1
+    def test_reset_password_check_expired_code(self, request_factory, org):
+        from django.utils import timezone as tz
+        from datetime import timedelta as td
+        user = factories.CoreUser.create(
+            organization=org,
+            username='expired@example.com',
+            email='expired@example.com',
+            is_active=True,
         )
-        with mock.patch(
-            'django.contrib.auth.tokens.PasswordResetTokenGenerator._today',
-            return_value=mock_date,
-        ):
-            request = request_factory.post(
-                reverse('coreuser-reset-password-check'), data
-            )
-            response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(
-                request
-            )
-            assert response.status_code == 200
-            assert response.data['success'] is False
+        code_obj = factories.PasswordResetCode.create(
+            user=user,
+            code='654321',
+            expires_at=tz.now() - td(minutes=1),
+        )
+        data = {'email': user.username, 'code': '654321'}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is False
+        assert 'expired' in response.data['message']
+
+    def test_reset_password_check_used_code(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='usedcode@example.com',
+            email='usedcode@example.com',
+            is_active=True,
+        )
+        factories.PasswordResetCode.create(user=user, code='654321', is_used=True)
+        data = {'email': user.username, 'code': '654321'}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is False
+
+    def test_reset_password_check_wrong_code(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {'email': user.username, 'code': '999999'}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is False
+
+    def test_reset_password_check_unknown_email(self, request_factory):
+        data = {'email': 'nobody@example.com', 'code': '123456'}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is False
+        # enumeration-safe: same body as wrong-code case
+        assert response.data['message'] == (
+            'Invalid code or code has expired. Please resend code and try again.'
+        )
+
+    def test_reset_password_check_missing_fields(self, request_factory):
+        request = request_factory.post(reverse('coreuser-reset-password-check'), {})
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 400
+
+    def test_reset_password_check_does_not_mark_code_used(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {'email': user.username, 'code': code_obj.code}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is True
+        code_obj.refresh_from_db()
+        assert code_obj.is_used is False
 
     def test_reset_password_confirm(self, request_factory, reset_password_request):
         test_password = '5UU74e7nfU'

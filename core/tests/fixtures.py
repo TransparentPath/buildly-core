@@ -67,6 +67,19 @@ def reset_password_request(org_member):
 
 
 @pytest.fixture
+def valid_reset_code(org):
+    user = factories.CoreUser.create(
+        organization=org,
+        username='resetuser@example.com',
+        email='resetuser@example.com',
+        is_active=True,
+    )
+    from factories import PasswordResetCode as PasswordResetCodeFactory
+    code_obj = PasswordResetCodeFactory.create(user=user, code='654321')
+    return user, code_obj
+
+
+@pytest.fixture
 def auth_api_client():
     api_client = APIClient()
     api_client.force_authenticate(user=factories.CoreUser.create())

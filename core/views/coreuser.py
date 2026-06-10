@@ -11,7 +11,7 @@ from rest_framework.response import Response
 import django_filters
 import jwt
 from drf_yasg.utils import swagger_auto_schema
-from core.models import CoreUser, Organization, CoreGroup, OrganizationType
+from core.models import CoreUser, Organization, CoreGroup, OrganizationType, PasswordResetCode
 from core.serializers import (
     CoreUserSerializer,
     CoreUserWritableSerializer,
@@ -338,15 +338,43 @@ class CoreUserViewSet(
     @swagger_auto_schema(
         methods=['post'],
         request_body=CoreUserResetPasswordCheckSerializer,
-        responses=SUCCESS_RESPONSE,
+        responses=DETAIL_RESPONSE,
     )
     @action(methods=['POST'], detail=False)
     def reset_password_check(self, request, *args, **kwargs):
         """
-        This endpoint is used to check that token is valid.
+        Verify that a 6-digit password reset code is valid for the given email.
+        Always returns HTTP 200; the `is_valid` flag in the body indicates outcome.
         """
         serializer = self.get_serializer(data=request.data)
-        return Response({'success': serializer.is_valid()}, status=status.HTTP_200_OK)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+        code = serializer.validated_data['code']
+
+        user = CoreUser.objects.filter(username=email).first()
+        if user:
+            reset_code = PasswordResetCode.objects.filter(
+                user=user,
+                code=code,
+                is_used=False,
+            ).first()
+            if reset_code and reset_code.is_valid():
+                return Response(
+                    {
+                        'message': 'Reset code verified and found valid',
+                        'is_valid': True,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+        return Response(
+            {
+                'message': 'Invalid code or code has expired. Please resend code and try again.',
+                'is_valid': False,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @swagger_auto_schema(
         methods=['post'],

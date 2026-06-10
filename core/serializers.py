@@ -359,37 +359,29 @@ class CoreUserResetPasswordSerializer(serializers.Serializer):
 
 
 class CoreUserResetPasswordCheckSerializer(serializers.Serializer):
-    """Serializer for checking token for resetting password
-    """
+    """Serializer for validating 6-digit password reset code payload."""
+
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
+
+
+class CoreUserResetPasswordConfirmSerializer(serializers.Serializer):
+    """Serializer for reset password data (uid/token flow — to be replaced in follow-up ticket)."""
 
     uid = serializers.CharField()
     token = serializers.CharField()
+    new_password1 = serializers.CharField(max_length=128)
+    new_password2 = serializers.CharField(max_length=128)
 
     def validate(self, attrs):
-        # Decode the uidb64 to uid to get User object
         try:
             uid = force_str(urlsafe_base64_decode(attrs['uid']))
             self.user = CoreUser.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, CoreUser.DoesNotExist):
             raise serializers.ValidationError({'uid': ['Invalid value']})
 
-        # Check the token
         if not default_token_generator.check_token(self.user, attrs['token']):
             raise serializers.ValidationError({'token': ['Invalid value']})
-
-        return attrs
-
-
-class CoreUserResetPasswordConfirmSerializer(CoreUserResetPasswordCheckSerializer):
-    """Serializer for reset password data
-    """
-
-    new_password1 = serializers.CharField(max_length=128)
-    new_password2 = serializers.CharField(max_length=128)
-
-    def validate(self, attrs):
-
-        attrs = super().validate(attrs)
 
         password1 = attrs.get('new_password1')
         password2 = attrs.get('new_password2')
@@ -400,7 +392,7 @@ class CoreUserResetPasswordConfirmSerializer(CoreUserResetPasswordCheckSerialize
         return attrs
 
     def save(self):
-        self.user.set_password(self.validated_data["new_password1"])
+        self.user.set_password(self.validated_data['new_password1'])
         self.user.save()
         return self.user
 
