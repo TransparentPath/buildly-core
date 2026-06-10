@@ -6,11 +6,8 @@ from datetime import timedelta
 from urllib.parse import urljoin
 
 from django.contrib.auth import password_validation
-from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from django.utils import timezone
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.template import Template, Context
 
 from rest_framework import serializers
@@ -366,35 +363,12 @@ class CoreUserResetPasswordCheckSerializer(serializers.Serializer):
 
 
 class CoreUserResetPasswordConfirmSerializer(serializers.Serializer):
-    """Serializer for reset password data (uid/token flow — to be replaced in follow-up ticket)."""
+    """Serializer for 6-digit password reset confirm payload (field shape only)."""
 
-    uid = serializers.CharField()
-    token = serializers.CharField()
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
     new_password1 = serializers.CharField(max_length=128)
     new_password2 = serializers.CharField(max_length=128)
-
-    def validate(self, attrs):
-        try:
-            uid = force_str(urlsafe_base64_decode(attrs['uid']))
-            self.user = CoreUser.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, CoreUser.DoesNotExist):
-            raise serializers.ValidationError({'uid': ['Invalid value']})
-
-        if not default_token_generator.check_token(self.user, attrs['token']):
-            raise serializers.ValidationError({'token': ['Invalid value']})
-
-        password1 = attrs.get('new_password1')
-        password2 = attrs.get('new_password2')
-        if password1 != password2:
-            raise serializers.ValidationError("The two password fields didn't match.")
-        password_validation.validate_password(password2, self.user)
-
-        return attrs
-
-    def save(self):
-        self.user.set_password(self.validated_data['new_password1'])
-        self.user.save()
-        return self.user
 
 
 class OrganizationSerializer(serializers.ModelSerializer):

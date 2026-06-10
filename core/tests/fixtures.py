@@ -1,9 +1,6 @@
 import uuid
 from django.conf import settings
 import pytest
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
 
 import factories
@@ -57,13 +54,6 @@ def org_admin(org):
     coreuser = factories.CoreUser.create(organization=group_org_admin.organization)
     coreuser.core_groups.add(group_org_admin)
     return coreuser
-
-
-@pytest.fixture
-def reset_password_request(org_member):
-    uid = urlsafe_base64_encode(force_bytes(org_member.pk))
-    token = default_token_generator.make_token(org_member)
-    return org_member, uid, token
 
 
 @pytest.fixture

@@ -1,6 +1,8 @@
 import requests
 from urllib.parse import urljoin, quote
 
+from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files import File
 from django.conf import settings
 from django.db import transaction
@@ -384,13 +386,56 @@ class CoreUserViewSet(
     @action(methods=['POST'], detail=False)
     def reset_password_confirm(self, request, *args, **kwargs):
         """
-        This endpoint is used to change password if the token is valid
+        Confirm a password reset using a 6-digit code.
+        Sets the new password and marks the code as used to prevent replay.
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+
+        email = serializer.validated_data['email']
+        code = serializer.validated_data['code']
+        new_password1 = serializer.validated_data['new_password1']
+        new_password2 = serializer.validated_data['new_password2']
+
+        if new_password1 != new_password2:
+            return Response(
+                {'message': "The two password fields didn't match."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        failure_response = Response(
+            {'message': 'Invalid code or code has expired. Please resend code and try again.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+        user = CoreUser.objects.filter(username=email, is_active=True).first()
+        if not user:
+            return failure_response
+
+        reset_code = PasswordResetCode.objects.filter(
+            user=user,
+            code=code,
+            is_used=False,
+        ).first()
+        if not reset_code or not reset_code.is_valid():
+            return failure_response
+
+        try:
+            password_validation.validate_password(new_password1, user)
+        except DjangoValidationError as exc:
+            return Response(
+                {'message': exc.messages[0]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            user.set_password(new_password1)
+            user.save()
+            reset_code.is_used = True
+            reset_code.save()
+
         return Response(
-            {'detail': 'The password was changed successfully.'},
+            {'message': 'The password was changed successfully.'},
             status=status.HTTP_200_OK,
         )
 

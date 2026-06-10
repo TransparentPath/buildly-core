@@ -6,7 +6,6 @@ from core.tests.fixtures import (
     org,
     org_admin,
     org_member,
-    reset_password_request,
 )
 from core.models import CoreGroup
 from core.views import CoreGroupViewSet
