@@ -2,13 +2,12 @@ import jwt
 import requests
 import secrets
 
+from datetime import timedelta
 from urllib.parse import urljoin
 
 from django.contrib.auth import password_validation
-from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils import timezone
 from django.template import Template, Context
 
 from rest_framework import serializers
@@ -23,6 +22,7 @@ from core.models import (
     EmailTemplate,
     LogicModule,
     Organization,
+    PasswordResetCode,
     TEMPLATE_RESET_PASSWORD,
     OrganizationType,
     Consortium,
@@ -322,98 +322,53 @@ class CoreUserResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def save(self, **kwargs):
-        resetpass_url = urljoin(
-            settings.FRONTEND_URL, settings.RESETPASS_CONFIRM_URL_PATH
-        )
-        resetpass_url = resetpass_url + '{uid}/{token}/'
-
-        email = self.validated_data["email"]
+        email = self.validated_data['email']
 
         count = 0
-        for user in CoreUser.objects.filter(email=email, is_active=True):
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
+        for user in CoreUser.objects.filter(username=email, is_active=True):
+            # Invalidate all prior unused codes for this user
+            PasswordResetCode.objects.filter(user=user, is_used=False).update(is_used=True)
+
+            # Generate a cryptographically secure 6-digit code
+            code = f'{secrets.randbelow(1_000_000):06d}'
+
+            # Persist new code with 15-minute expiry
+            PasswordResetCode.objects.create(
+                user=user,
+                code=code,
+                expires_at=timezone.now() + timedelta(minutes=15),
+            )
+
             context = {
-                'password_reset_link': resetpass_url.format(uid=uid, token=token),
+                'reset_password_code': code,
                 'user': user,
             }
 
-            # get specific subj and templates for user's organization
-            tpl = EmailTemplate.objects.filter(
-                organization=user.organization, type=TEMPLATE_RESET_PASSWORD
-            ).first()
-            if not tpl:
-                tpl = EmailTemplate.objects.filter(
-                    organization__name=settings.DEFAULT_ORG,
-                    type=TEMPLATE_RESET_PASSWORD,
-                ).first()
-            if tpl and tpl.template:
-                context = Context(context)
-                text_content = Template(tpl.template).render(context)
-                html_content = (
-                    Template(tpl.template_html).render(context)
-                    if tpl.template_html
-                    else None
-                )
-                count += send_email_body(email, tpl.subject, text_content, html_content, [], settings.SUPPORT_EMAIL_ADDRESS, settings.DEFAULT_FROM_EMAIL)
-                continue
-
             # default subject and templates
-            subject = 'Update Password'
+            subject = 'Forgot Password'
             template_name = 'email/coreuser/password_reset.txt'
             html_template_name = 'email/coreuser/password_reset.html'
             count += send_email(
-                email, subject, context, template_name, html_template_name, cc_email_address=settings.SUPPORT_EMAIL_ADDRESS
+                user.email, subject, context, template_name, html_template_name, cc_email_address=settings.SUPPORT_EMAIL_ADDRESS
             )
 
         return count
 
 
 class CoreUserResetPasswordCheckSerializer(serializers.Serializer):
-    """Serializer for checking token for resetting password
-    """
+    """Serializer for validating 6-digit password reset code payload."""
 
-    uid = serializers.CharField()
-    token = serializers.CharField()
-
-    def validate(self, attrs):
-        # Decode the uidb64 to uid to get User object
-        try:
-            uid = force_str(urlsafe_base64_decode(attrs['uid']))
-            self.user = CoreUser.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, CoreUser.DoesNotExist):
-            raise serializers.ValidationError({'uid': ['Invalid value']})
-
-        # Check the token
-        if not default_token_generator.check_token(self.user, attrs['token']):
-            raise serializers.ValidationError({'token': ['Invalid value']})
-
-        return attrs
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
 
 
-class CoreUserResetPasswordConfirmSerializer(CoreUserResetPasswordCheckSerializer):
-    """Serializer for reset password data
-    """
+class CoreUserResetPasswordConfirmSerializer(serializers.Serializer):
+    """Serializer for 6-digit password reset confirm payload (field shape only)."""
 
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
     new_password1 = serializers.CharField(max_length=128)
     new_password2 = serializers.CharField(max_length=128)
-
-    def validate(self, attrs):
-
-        attrs = super().validate(attrs)
-
-        password1 = attrs.get('new_password1')
-        password2 = attrs.get('new_password2')
-        if password1 != password2:
-            raise serializers.ValidationError("The two password fields didn't match.")
-        password_validation.validate_password(password2, self.user)
-
-        return attrs
-
-    def save(self):
-        self.user.set_password(self.validated_data["new_password1"])
-        self.user.save()
-        return self.user
 
 
 class OrganizationSerializer(serializers.ModelSerializer):

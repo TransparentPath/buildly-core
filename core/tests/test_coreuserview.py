@@ -1,18 +1,14 @@
 import json
-from datetime import date, timedelta
-from urllib.parse import urljoin
-from unittest import mock
+import re
+from datetime import timedelta
 
 import pytest
 from django.core import mail
-from django.contrib.auth.tokens import default_token_generator
-from django.conf import settings
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
+from django.utils import timezone
 from rest_framework.reverse import reverse
 
 import factories
-from core.models import CoreUser, EmailTemplate, TEMPLATE_RESET_PASSWORD
+from core.models import CoreUser, PasswordResetCode
 from core.views import CoreUserViewSet
 from core.jwt_utils import create_invitation_token
 from core.tests.fixtures import (
@@ -20,7 +16,7 @@ from core.tests.fixtures import (
     org_admin,
     org_member,
     org,
-    reset_password_request,
+    valid_reset_code,
 )
 
 
@@ -263,14 +259,16 @@ class TestCoreUserInvite:
 
 @pytest.mark.django_db()
 class TestResetPassword(object):
-    def test_reset_password_using_default_emailtemplate(
-        self, request_factory, org_member
-    ):
-        email = org_member.email
-        assert list(org_member.organization.emailtemplate_set.all()) == []
-        # assert list(Organization.objects.filter(name=settings.DEFAULT_ORG)) == [] -- Removed this assertion to support organization name here
+    def test_reset_password_sends_code(self, request_factory, org):
+        # Username is an email-format value so it passes EmailField validation
+        user = factories.CoreUser.create(
+            organization=org,
+            username='user@example.com',
+            email='user@example.com',
+            is_active=True,
+        )
         request = request_factory.post(
-            reverse('coreuser-reset-password'), {'email': email}
+            reverse('coreuser-reset-password'), {'email': 'user@example.com'}
         )
         response = CoreUserViewSet.as_view({'post': 'reset_password'})(request)
         assert response.status_code == 200
@@ -278,84 +276,10 @@ class TestResetPassword(object):
         assert mail.outbox
 
         message = mail.outbox[0]
-        assert message.to == [email]
+        assert message.to == [user.email]
+        assert re.search(r'\b\d{6}\b', message.body)
 
-        resetpass_url = urljoin(
-            settings.FRONTEND_URL, settings.RESETPASS_CONFIRM_URL_PATH
-        )
-        uid = urlsafe_base64_encode(force_bytes(org_member.pk))
-        token = default_token_generator.make_token(org_member)
-        assert f'{resetpass_url}{uid}/{token}/' in message.body
-
-    def test_reset_password_using_org_template(self, request_factory, org_member):
-        email = org_member.email
-
-        EmailTemplate.objects.create(
-            organization=org_member.organization,
-            type=TEMPLATE_RESET_PASSWORD,
-            subject='Custom subject',
-            template="""
-                Custom template
-                {{ password_reset_link }}
-                """,
-        )
-
-        request = request_factory.post(
-            reverse('coreuser-reset-password'), {'email': email}
-        )
-        response = CoreUserViewSet.as_view({'post': 'reset_password'})(request)
-        assert response.status_code == 200
-        assert response.data['count'] == 1
-        assert mail.outbox
-
-        message = mail.outbox[0]
-        assert message.to == [email]
-
-        resetpass_url = urljoin(
-            settings.FRONTEND_URL, settings.RESETPASS_CONFIRM_URL_PATH
-        )
-        uid = urlsafe_base64_encode(force_bytes(org_member.pk))
-        token = default_token_generator.make_token(org_member)
-        assert message.subject == 'Custom subject'
-        assert 'Custom template' in message.body
-        assert f'{resetpass_url}{uid}/{token}/' in message.body
-
-    def test_reset_password_using_default_org_template(
-        self, request_factory, org_member
-    ):
-        email = org_member.email
-
-        default_organization = factories.Organization(name=settings.DEFAULT_ORG)
-
-        EmailTemplate.objects.create(
-            organization=default_organization,
-            type=TEMPLATE_RESET_PASSWORD,
-            subject='Custom subject',
-            template="""
-                Custom template
-                {{ password_reset_link }}
-                """,
-        )
-
-        request = request_factory.post(
-            reverse('coreuser-reset-password'), {'email': email}
-        )
-        response = CoreUserViewSet.as_view({'post': 'reset_password'})(request)
-        assert response.status_code == 200
-        assert response.data['count'] == 1
-        assert mail.outbox
-
-        message = mail.outbox[0]
-        assert message.to == [email]
-
-        resetpass_url = urljoin(
-            settings.FRONTEND_URL, settings.RESETPASS_CONFIRM_URL_PATH
-        )
-        uid = urlsafe_base64_encode(force_bytes(org_member.pk))
-        token = default_token_generator.make_token(org_member)
-        assert message.subject == 'Custom subject'
-        assert 'Custom template' in message.body
-        assert f'{resetpass_url}{uid}/{token}/' in message.body
+        assert PasswordResetCode.objects.filter(user=user).exists()
 
     def test_reset_password_no_user(self, request_factory):
         request = request_factory.post(
@@ -365,97 +289,376 @@ class TestResetPassword(object):
         assert response.status_code == 200
         assert response.data['count'] == 0
 
-    def test_reset_password_check(self, request_factory, reset_password_request):
-        user, uid, token = reset_password_request
-        data = {'uid': uid, 'token': token}
+    def test_reset_password_matches_on_username_not_email(self, request_factory, org):
+        # Create a user whose username (login) differs from their contact email.
+        # Both must be valid email format since the serializer uses EmailField.
+        user = factories.CoreUser.create(
+            organization=org,
+            username='jane.login@example.com',
+            email='jane.contact@example.com',
+            is_active=True,
+        )
+
+        # Posting the username value → lookup by username matches → email sent
+        request = request_factory.post(
+            reverse('coreuser-reset-password'), {'email': 'jane.login@example.com'}
+        )
+        response = CoreUserViewSet.as_view({'post': 'reset_password'})(request)
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+        assert len(mail.outbox) == 1
+
+        # Posting the contact email address → no match on username → count 0
+        mail.outbox.clear()
+        request = request_factory.post(
+            reverse('coreuser-reset-password'), {'email': 'jane.contact@example.com'}
+        )
+        response = CoreUserViewSet.as_view({'post': 'reset_password'})(request)
+        assert response.status_code == 200
+        assert response.data['count'] == 0
+        assert len(mail.outbox) == 0
+
+    def test_reset_password_inactive_user_skipped(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='inactive@example.com',
+            email='inactive@example.com',
+            is_active=False,
+        )
+        request = request_factory.post(
+            reverse('coreuser-reset-password'), {'email': 'inactive@example.com'}
+        )
+        response = CoreUserViewSet.as_view({'post': 'reset_password'})(request)
+        assert response.status_code == 200
+        assert response.data['count'] == 0
+        assert len(mail.outbox) == 0
+        assert not PasswordResetCode.objects.filter(user=user).exists()
+
+    def test_reset_password_marks_previous_codes_expired(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='repeat@example.com',
+            email='repeat@example.com',
+            is_active=True,
+        )
+
+        # First request
+        request = request_factory.post(
+            reverse('coreuser-reset-password'), {'email': 'repeat@example.com'}
+        )
+        CoreUserViewSet.as_view({'post': 'reset_password'})(request)
+
+        first_code = PasswordResetCode.objects.filter(user=user).first()
+        assert first_code is not None
+        assert first_code.is_used is False
+
+        # Second request — previous code must be marked used
+        request = request_factory.post(
+            reverse('coreuser-reset-password'), {'email': 'repeat@example.com'}
+        )
+        CoreUserViewSet.as_view({'post': 'reset_password'})(request)
+
+        first_code.refresh_from_db()
+        assert first_code.is_used is True
+
+        latest_code = PasswordResetCode.objects.filter(user=user, is_used=False).first()
+        assert latest_code is not None
+        assert latest_code.pk != first_code.pk
+
+    def test_reset_password_code_format(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='format@example.com',
+            email='format@example.com',
+            is_active=True,
+        )
+        request = request_factory.post(
+            reverse('coreuser-reset-password'), {'email': 'format@example.com'}
+        )
+        CoreUserViewSet.as_view({'post': 'reset_password'})(request)
+
+        code_obj = PasswordResetCode.objects.filter(user=user).first()
+        assert code_obj is not None
+        assert len(code_obj.code) == 6
+        assert code_obj.code.isdigit()
+
+    def test_reset_password_code_expires_at_15_minutes(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='expiry@example.com',
+            email='expiry@example.com',
+            is_active=True,
+        )
+        request = request_factory.post(
+            reverse('coreuser-reset-password'), {'email': 'expiry@example.com'}
+        )
+        CoreUserViewSet.as_view({'post': 'reset_password'})(request)
+
+        code_obj = PasswordResetCode.objects.filter(user=user).first()
+        assert code_obj is not None
+        delta = code_obj.expires_at - code_obj.created_at
+        assert abs(delta.total_seconds() - 900) < 5  # 15 minutes ± 5 seconds
+
+    def test_reset_password_email_sent_to_user_email_not_username(self, request_factory, org):
+        # username is the login identifier; email is the actual delivery address
+        user = factories.CoreUser.create(
+            organization=org,
+            username='delivery.login@example.com',
+            email='delivery.actual@example.com',
+            is_active=True,
+        )
+        request = request_factory.post(
+            reverse('coreuser-reset-password'), {'email': 'delivery.login@example.com'}
+        )
+        CoreUserViewSet.as_view({'post': 'reset_password'})(request)
+
+        assert len(mail.outbox) == 1
+        assert mail.outbox[0].to == ['delivery.actual@example.com']
+
+    def test_reset_password_check_valid_code(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {'email': user.username, 'code': code_obj.code}
         request = request_factory.post(reverse('coreuser-reset-password-check'), data)
         response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
         assert response.status_code == 200
-        assert response.data['success'] is True
+        assert response.data['is_valid'] is True
+        assert response.data['message'] == 'Reset code verified and found valid'
+        # read-only — code must not be marked used
+        code_obj.refresh_from_db()
+        assert code_obj.is_used is False
 
-    def test_reset_password_check_expired(
-        self, request_factory, reset_password_request
-    ):
-        user, uid, token = reset_password_request
-        data = {'uid': uid, 'token': token}
-        mock_date = date.today() + timedelta(
-            int(settings.PASSWORD_RESET_TIMEOUT_DAYS) + 1
+    def test_reset_password_check_expired_code(self, request_factory, org):
+        from django.utils import timezone as tz
+        from datetime import timedelta as td
+        user = factories.CoreUser.create(
+            organization=org,
+            username='expired@example.com',
+            email='expired@example.com',
+            is_active=True,
         )
-        with mock.patch(
-            'django.contrib.auth.tokens.PasswordResetTokenGenerator._today',
-            return_value=mock_date,
-        ):
-            request = request_factory.post(
-                reverse('coreuser-reset-password-check'), data
-            )
-            response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(
-                request
-            )
-            assert response.status_code == 200
-            assert response.data['success'] is False
+        code_obj = factories.PasswordResetCode.create(
+            user=user,
+            code='654321',
+            expires_at=tz.now() - td(minutes=1),
+        )
+        data = {'email': user.username, 'code': '654321'}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is False
+        assert 'expired' in response.data['message']
 
-    def test_reset_password_confirm(self, request_factory, reset_password_request):
-        test_password = '5UU74e7nfU'
-        user, uid, token = reset_password_request
+    def test_reset_password_check_used_code(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='usedcode@example.com',
+            email='usedcode@example.com',
+            is_active=True,
+        )
+        factories.PasswordResetCode.create(user=user, code='654321', is_used=True)
+        data = {'email': user.username, 'code': '654321'}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is False
+
+    def test_reset_password_check_wrong_code(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {'email': user.username, 'code': '999999'}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is False
+
+    def test_reset_password_check_unknown_email(self, request_factory):
+        data = {'email': 'nobody@example.com', 'code': '123456'}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is False
+        # enumeration-safe: same body as wrong-code case
+        assert response.data['message'] == (
+            'Invalid code or code has expired. Please resend code and try again.'
+        )
+
+    def test_reset_password_check_missing_fields(self, request_factory):
+        request = request_factory.post(reverse('coreuser-reset-password-check'), {})
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 400
+
+    def test_reset_password_check_does_not_mark_code_used(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {'email': user.username, 'code': code_obj.code}
+        request = request_factory.post(reverse('coreuser-reset-password-check'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_check'})(request)
+        assert response.status_code == 200
+        assert response.data['is_valid'] is True
+        code_obj.refresh_from_db()
+        assert code_obj.is_used is False
+
+    def test_reset_password_confirm_success(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
         data = {
-            'new_password1': test_password,
-            'new_password2': test_password,
-            'uid': uid,
-            'token': token,
+            'email': user.username,
+            'code': '654321',
+            'new_password1': '5UU74e7nfU',
+            'new_password2': '5UU74e7nfU',
         }
         request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
         response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
         assert response.status_code == 200
+        assert response.data == {'message': 'The password was changed successfully.'}
+        user.refresh_from_db()
+        assert user.check_password('5UU74e7nfU')
+        code_obj.refresh_from_db()
+        assert code_obj.is_used is True
 
-        # check that password was changed
-        updated_user = CoreUser.objects.get(pk=user.pk)
-        assert updated_user.check_password(test_password)
-
-    def test_reset_password_confirm_diff_passwords(
-        self, request_factory, reset_password_request
-    ):
-        test_password1 = '5UU74e7nfU'
-        test_password2 = '5UU74e7nfUa'
-        user, uid, token = reset_password_request
+    def test_reset_password_confirm_marks_code_used(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
         data = {
-            'new_password1': test_password1,
-            'new_password2': test_password2,
-            'uid': uid,
-            'token': token,
+            'email': user.username,
+            'code': '654321',
+            'new_password1': '5UU74e7nfU',
+            'new_password2': '5UU74e7nfU',
+        }
+        request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
+        CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
+        code_obj.refresh_from_db()
+        assert code_obj.is_used is True
+
+    def test_reset_password_confirm_diff_passwords(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {
+            'email': user.username,
+            'code': '654321',
+            'new_password1': '5UU74e7nfU',
+            'new_password2': '5UU74e7nfUa',
         }
         request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
         response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
-        assert (
-            response.status_code == 400
-        )  # validation error (password fields didn't match)
+        assert response.status_code == 400
+        assert "didn't match" in response.data['message']
+        code_obj.refresh_from_db()
+        assert code_obj.is_used is False
 
-    def test_reset_password_confirm_token_expired(
-        self, request_factory, reset_password_request
-    ):
-        test_password = '5UU74e7nfU'
-        user, uid, token = reset_password_request
-        data = {
-            'new_password1': test_password,
-            'new_password2': test_password,
-            'uid': uid,
-            'token': token,
-        }
-        mock_date = date.today() + timedelta(
-            int(settings.PASSWORD_RESET_TIMEOUT_DAYS) + 1
+    def test_reset_password_confirm_expired_code(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='confirmexpired@example.com',
+            email='confirmexpired@example.com',
+            is_active=True,
         )
-        with mock.patch(
-            'django.contrib.auth.tokens.PasswordResetTokenGenerator._today',
-            return_value=mock_date,
-        ):
-            request = request_factory.post(
-                reverse('coreuser-reset-password-confirm'), data
-            )
-            response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(
-                request
-            )
-            assert (
-                response.status_code == 400
-            )  # validation error (the token is expired)
+        factories.PasswordResetCode.create(
+            user=user,
+            code='111111',
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+        data = {
+            'email': user.username,
+            'code': '111111',
+            'new_password1': '5UU74e7nfU',
+            'new_password2': '5UU74e7nfU',
+        }
+        request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
+        assert response.status_code == 400
+        assert 'expired' in response.data['message']
+
+    def test_reset_password_confirm_used_code(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='confirmused@example.com',
+            email='confirmused@example.com',
+            is_active=True,
+        )
+        factories.PasswordResetCode.create(user=user, code='222222', is_used=True)
+        data = {
+            'email': user.username,
+            'code': '222222',
+            'new_password1': '5UU74e7nfU',
+            'new_password2': '5UU74e7nfU',
+        }
+        request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
+        assert response.status_code == 400
+        assert response.data['message'] == (
+            'Invalid code or code has expired. Please resend code and try again.'
+        )
+
+    def test_reset_password_confirm_wrong_code(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {
+            'email': user.username,
+            'code': '999999',
+            'new_password1': '5UU74e7nfU',
+            'new_password2': '5UU74e7nfU',
+        }
+        request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
+        assert response.status_code == 400
+        assert response.data['message'] == (
+            'Invalid code or code has expired. Please resend code and try again.'
+        )
+
+    def test_reset_password_confirm_unknown_email(self, request_factory):
+        data = {
+            'email': 'nobody@example.com',
+            'code': '123456',
+            'new_password1': '5UU74e7nfU',
+            'new_password2': '5UU74e7nfU',
+        }
+        request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
+        assert response.status_code == 400
+        assert response.data['message'] == (
+            'Invalid code or code has expired. Please resend code and try again.'
+        )
+
+    def test_reset_password_confirm_inactive_user(self, request_factory, org):
+        user = factories.CoreUser.create(
+            organization=org,
+            username='inactiveconfirm@example.com',
+            email='inactiveconfirm@example.com',
+            is_active=False,
+        )
+        factories.PasswordResetCode.create(user=user, code='333333')
+        original_password = user.password
+        data = {
+            'email': user.username,
+            'code': '333333',
+            'new_password1': '5UU74e7nfU',
+            'new_password2': '5UU74e7nfU',
+        }
+        request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
+        assert response.status_code == 400
+        assert response.data['message'] == (
+            'Invalid code or code has expired. Please resend code and try again.'
+        )
+        user.refresh_from_db()
+        assert user.password == original_password
+
+    def test_reset_password_confirm_weak_password(self, request_factory, valid_reset_code):
+        user, code_obj = valid_reset_code
+        data = {
+            'email': user.username,
+            'code': '654321',
+            'new_password1': 'short',
+            'new_password2': 'short',
+        }
+        request = request_factory.post(reverse('coreuser-reset-password-confirm'), data)
+        response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
+        assert response.status_code == 400
+        assert 'message' in response.data
+        # MinimumLengthValidator fires — message mentions password length
+        assert len(response.data['message']) > 0
+
+    def test_reset_password_confirm_missing_fields(self, request_factory):
+        request = request_factory.post(reverse('coreuser-reset-password-confirm'), {})
+        response = CoreUserViewSet.as_view({'post': 'reset_password_confirm'})(request)
+        assert response.status_code == 400
+        # DRF field-level errors — no 'message' key
+        assert 'email' in response.data
 
 
 @pytest.mark.django_db()
