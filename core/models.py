@@ -313,6 +313,7 @@ class CoreUser(AbstractUser):
     user_timezone = models.CharField(blank=True, null=True, max_length=255)
     user_language = models.CharField(blank=True, null=True, max_length=255)
     last_gdpr_shown = models.DateTimeField(null=True, blank=True)
+    profile_pic = models.TextField(blank=True, null=True, help_text='Base64-encoded profile picture (data URL)')
 
     REQUIRED_FIELDS = []
 

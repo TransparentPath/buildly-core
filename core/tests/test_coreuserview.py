@@ -684,6 +684,7 @@ class TestCoreUserRead(object):
         'user_timezone',
         'last_gdpr_shown',
         'user_language',
+        'profile_pic',
     }
 
     def test_coreuser_list(self, request_factory, org_member):
@@ -721,3 +722,133 @@ class TestCoreUserRead(object):
         response = CoreUserViewSet.as_view({'get': 'me'})(request)
         assert response.status_code == 200
         assert response.data['username'] == org_member.username
+
+
+# A minimal valid 1x1 PNG expressed as a base64 data URL.
+TINY_PNG_DATA_URL = (
+    'data:image/png;base64,'
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgAAIAAAUAAeImBZsAAAAASUVORK5CYII='
+)
+
+
+@pytest.mark.django_db()
+class TestUpdateProfilePic:
+    """Tests for profile_pic field on the update_profile action and read endpoints."""
+
+    def _patch_update_profile(self, request_factory, user, data):
+        """Helper: PATCH /coreuser/<pk>/update_profile/ as the user themselves."""
+        pk = user.pk
+        request = request_factory.patch(
+            reverse('coreuser-update-profile', args=(pk,)), data, format='json'
+        )
+        request.user = user
+        return CoreUserViewSet.as_view({'patch': 'update_profile'})(request, pk=pk)
+
+    def test_update_profile_sets_profile_pic(self, request_factory, org_member):
+        data = {'organization_name': org_member.organization.name, 'profile_pic': TINY_PNG_DATA_URL}
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        assert response.data['profile_pic'] == TINY_PNG_DATA_URL
+        org_member.refresh_from_db()
+        assert org_member.profile_pic == TINY_PNG_DATA_URL
+
+    def test_update_profile_clears_profile_pic_empty_string(self, request_factory, org_member):
+        org_member.profile_pic = TINY_PNG_DATA_URL
+        org_member.save()
+        data = {'organization_name': org_member.organization.name, 'profile_pic': ''}
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.profile_pic == ''
+
+    def test_update_profile_clears_profile_pic_null(self, request_factory, org_member):
+        org_member.profile_pic = TINY_PNG_DATA_URL
+        org_member.save()
+        data = {'organization_name': org_member.organization.name, 'profile_pic': None}
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.profile_pic is None
+
+    def test_update_profile_rejects_bad_mime(self, request_factory, org_member):
+        import base64
+        gif_payload = 'data:image/gif;base64,' + base64.b64encode(b'GIF89a').decode()
+        data = {'organization_name': org_member.organization.name, 'profile_pic': gif_payload}
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 400
+
+    def test_update_profile_rejects_oversize(self, request_factory, org_member):
+        import base64 as b64
+        oversized = b64.b64encode(b'\x00' * (5 * 1024 * 1024 + 1)).decode()
+        data = {
+            'organization_name': org_member.organization.name,
+            'profile_pic': 'data:image/png;base64,' + oversized,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 400
+
+    def test_update_profile_rejects_non_base64(self, request_factory, org_member):
+        data = {
+            'organization_name': org_member.organization.name,
+            'profile_pic': 'data:image/png;base64,!!!not-base64!!!',
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 400
+
+    def test_update_profile_rejects_non_data_url(self, request_factory, org_member):
+        data = {'organization_name': org_member.organization.name, 'profile_pic': 'hello'}
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 400
+
+    def test_update_profile_partial_preserves_other_fields(self, request_factory, org_member):
+        org_member.first_name = 'Preserved'
+        org_member.save()
+        data = {'organization_name': org_member.organization.name, 'profile_pic': TINY_PNG_DATA_URL}
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.first_name == 'Preserved'
+        assert org_member.profile_pic == TINY_PNG_DATA_URL
+
+    def test_retrieve_includes_profile_pic(self, request_factory, org_member):
+        org_member.profile_pic = TINY_PNG_DATA_URL
+        org_member.save()
+        pk = org_member.pk
+        request = request_factory.get(reverse('coreuser-detail', args=(pk,)))
+        request.user = org_member
+        response = CoreUserViewSet.as_view({'get': 'retrieve'})(request, pk=pk)
+        assert response.status_code == 200
+        assert response.data['profile_pic'] == TINY_PNG_DATA_URL
+
+    def test_me_includes_profile_pic(self, request_factory, org_member):
+        org_member.profile_pic = TINY_PNG_DATA_URL
+        org_member.save()
+        request = request_factory.get(reverse('coreuser-list'))
+        request.user = org_member
+        response = CoreUserViewSet.as_view({'get': 'me'})(request)
+        assert response.status_code == 200
+        assert response.data['profile_pic'] == TINY_PNG_DATA_URL
+
+    def test_create_ignores_profile_pic(self, request_factory):
+        data = {**TEST_USER_DATA, 'profile_pic': TINY_PNG_DATA_URL}
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+        assert response.status_code == 201
+        user = CoreUser.objects.get(username=TEST_USER_DATA['username'])
+        assert not user.profile_pic
+
+    def test_update_ignores_profile_pic(self, request_factory, org_admin):
+        user = factories.CoreUser.create(
+            organization=org_admin.organization, username='profile_pic_user'
+        )
+        user.profile_pic = TINY_PNG_DATA_URL
+        user.save()
+        pk = user.pk
+        new_pic = 'data:image/jpeg;base64,' + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgAAIAAAUAAeImBZsAAAAASUVORK5CYII='
+        data = {'profile_pic': new_pic}
+        request = request_factory.patch(reverse('coreuser-detail', args=(pk,)), data)
+        request.user = org_admin
+        response = CoreUserViewSet.as_view({'patch': 'partial_update'})(request, pk=pk)
+        assert response.status_code == 200
+        user.refresh_from_db()
+        assert user.profile_pic == TINY_PNG_DATA_URL

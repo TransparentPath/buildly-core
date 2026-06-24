@@ -1,4 +1,7 @@
+import base64
+import binascii
 import jwt
+import re
 import requests
 import secrets
 
@@ -27,6 +30,29 @@ from core.models import (
     OrganizationType,
     Consortium,
 )
+
+_PROFILE_PIC_DATA_URL_RE = re.compile(r'^data:image/(png|jpeg|webp);base64,(.+)$', re.IGNORECASE)
+_PROFILE_PIC_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+_PROFILE_PIC_ERROR = (
+    'profile_pic must be a base64 data URL with mime type '
+    'image/png, image/jpeg, or image/webp, and decoded size ≤ 5 MB.'
+)
+
+
+def validate_profile_pic_data_url(value):
+    """Allow empty/null (clears the field). Otherwise enforce data URL + mime + size."""
+    if value in (None, ''):
+        return value
+    match = _PROFILE_PIC_DATA_URL_RE.match(value)
+    if not match:
+        raise serializers.ValidationError(_PROFILE_PIC_ERROR)
+    try:
+        decoded = base64.b64decode(match.group(2), validate=True)
+    except (binascii.Error, ValueError):
+        raise serializers.ValidationError(_PROFILE_PIC_ERROR)
+    if len(decoded) > _PROFILE_PIC_MAX_BYTES:
+        raise serializers.ValidationError(_PROFILE_PIC_ERROR)
+    return value
 
 
 class LogicModuleSerializer(serializers.ModelSerializer):
@@ -141,8 +167,9 @@ class CoreUserSerializer(serializers.ModelSerializer):
             'user_timezone',
             'last_gdpr_shown',
             'user_language',
+            'profile_pic',
         )
-        read_only_fields = ('core_user_uuid', 'organization')
+        read_only_fields = ('core_user_uuid', 'organization', 'profile_pic')
         depth = 1
 
 
@@ -245,6 +272,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
     user_timezone = serializers.CharField(required=False)
     user_language = serializers.CharField(required=False)
     last_gdpr_shown = serializers.DateTimeField(required=False)
+    profile_pic = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = CoreUser
@@ -262,7 +290,11 @@ class CoreUserProfileSerializer(serializers.Serializer):
             'user_timezone',
             'last_gdpr_shown',
             'user_language',
+            'profile_pic',
         )
+
+    def validate_profile_pic(self, value):
+        return validate_profile_pic_data_url(value)
 
     def update(self, instance, validated_data):
 
@@ -290,6 +322,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
         instance.user_timezone = validated_data.get('user_timezone', instance.user_timezone)
         instance.user_language = validated_data.get('user_language', instance.user_language)
         instance.last_gdpr_shown = validated_data.get('last_gdpr_shown', instance.last_gdpr_shown)
+        instance.profile_pic = validated_data.get('profile_pic', instance.profile_pic)
         password = validated_data.get('password', None)
         if password is not None:
             instance.set_password(password)
