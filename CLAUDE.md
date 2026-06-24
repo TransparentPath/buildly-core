@@ -9,6 +9,9 @@
 5. **File creation restricted to .claude folder** - All files created by Claude must be placed in the `./.claude` folder only, unless the user explicitly specifies a different location.
 6. **Task tracking required** - Always create tasks when executing an approved plan. Update the task status as you work on each item.
 7. **Update documentation after every change** - After any codebase change, always update `.claude/CLAUDE.md` before finishing. This is mandatory. Update the Last Updated date, reflect any new files, fonts, patterns, or architecture decisions, move resolved issues to the Resolved section, and add any new open issues. Never end a session without documentation being current.
+8. **Keep docs precise & within size caps (never bloat)** - These files have hard line limits; when an edit would exceed the cap, condense/consolidate existing content (summarize completed work, collapse per-item history, drop stale facts) rather than letting it grow:
+   - `CLAUDE.md` ≤ 180 lines
+   Write tersely; prefer summaries over blow-by-blow detail.
 
 ---
 
