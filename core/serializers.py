@@ -236,16 +236,25 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         coreuser.core_groups.set(core_groups)
         coreuser.save()
 
-        # create the used context for the E-mail templates
-        body_text = 'Administrator ' if 'admins' in user_role.lower() else core_groups[0].name
-        body_text += ' Account for ' + organization.name + ' was successfully created.'
+        # compute the role display name for the E-mail templates
+        role_lower = user_role.lower()
+        if 'admins' in role_lower:
+            role = 'Administrator'
+        elif role_lower == 'users' or role_lower.endswith('users'):
+            role = 'User'
+        elif user_role:
+            role = user_role[:-1] if user_role[-1].lower() == 's' else user_role
+        elif core_groups:
+            role = core_groups[0].name
+        else:
+            role = 'User'
 
         context = {
-            'signin_link': settings.FRONTEND_URL,
             'organization_name': organization.name,
-            'body_text': body_text,
+            'role': role,
+            'signin_link': settings.FRONTEND_URL,
         }
-        subject = 'Administrator Account Setup' if 'admins' in user_role.lower() else 'Account Setup'
+        subject = f"Welcome to {organization.name} on Transparent Path"
         template_name = 'email/coreuser/account_setup.txt'
         html_template_name = 'email/coreuser/account_setup.html'
         send_email(
@@ -359,6 +368,7 @@ class CoreUserResetPasswordSerializer(serializers.Serializer):
 
         count = 0
         for user in CoreUser.objects.filter(username=email, is_active=True):
+            expiry_minutes = 15
             # Invalidate all prior unused codes for this user
             PasswordResetCode.objects.filter(user=user, is_used=False).update(is_used=True)
 
@@ -369,16 +379,16 @@ class CoreUserResetPasswordSerializer(serializers.Serializer):
             PasswordResetCode.objects.create(
                 user=user,
                 code=code,
-                expires_at=timezone.now() + timedelta(minutes=15),
+                expires_at=timezone.now() + timedelta(minutes=expiry_minutes),
             )
 
             context = {
                 'reset_password_code': code,
-                'user': user,
+                'expiry_minutes': expiry_minutes,
             }
 
             # default subject and templates
-            subject = 'Forgot Password'
+            subject = 'Verify your email'
             template_name = 'email/coreuser/password_reset.txt'
             html_template_name = 'email/coreuser/password_reset.html'
             count += send_email(

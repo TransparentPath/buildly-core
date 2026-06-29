@@ -1,3 +1,12 @@
-Account Setup
+Welcome to {{ organization_name }}
 
-{{ body_text }}
+Your {{ role }} account on Transparent Path has been created. Sign in to start tracking shipments.
+
+ORGANIZATION: {{ organization_name }}
+YOUR ROLE: {{ role }}
+
+Sign in:
+{{ signin_link }}
+
+Need help? support@transparentpath.com
+© {% now "Y" %} Transparent Path spc.

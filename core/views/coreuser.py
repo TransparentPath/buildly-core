@@ -289,23 +289,21 @@ class CoreUserViewSet(
                 )
                 links.append(invitation_link)
 
-                # create the used context for the E-mail templates
-                body_text = 'Register to access the ' + organization.name + ' platform as '
-                
-                if user_role[0].lower() in 'aeiou' and user_role.lower() != 'users':
-                    if 'admins' in user_role.lower():
-                        body_text += 'an Administrator'
-                    else:
-                        body_text += 'an ' + user_role
+                # compute the role display name for the E-mail templates
+                role_lower = user_role.lower()
+                if 'admins' in role_lower:
+                    role = 'Administrator'
+                elif role_lower == 'users' or role_lower.endswith('users'):
+                    role = 'User'
                 else:
-                    body_text += 'a ' + (user_role[:-1] if user_role[-1].lower() == 's' else user_role)
+                    role = user_role[:-1] if user_role and user_role[-1].lower() == 's' else user_role
 
                 context = {
-                    'invitation_link': invitation_link,
                     'organization_name': organization.name,
-                    'body_text': body_text,
+                    'role': role,
+                    'invitation_link': invitation_link,
                 }
-                subject = 'Administrator Access' if 'admins' in user_role.lower() else 'User Access'
+                subject = f"You're invited to join {organization.name} on Transparent Path"
                 template_name = 'email/coreuser/invitation.txt'
                 html_template_name = 'email/coreuser/invitation.html'
                 send_email(

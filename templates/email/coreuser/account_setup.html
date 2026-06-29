@@ -1,145 +1,62 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
-	<head>
-		<meta charset="utf-8" />
-		<link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap"
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-		<title></title>
-	</head>
-	<body style="margin: 0px; font-family: 'IBM Plex Sans';">
-		<div
-			style="
-				background-color: #f5f5f5;
-				padding: 30px 0px 30px 0px;
-				display: run-in;
-				text-align: center;
-			"
-		>
-			<img
-				align="center"
-				alt="Transparent Path spc"
-				src="https://storage.googleapis.com/tp-prod-bucket/images/tp-logo-v2.png"
-				width="312.5"
-				style="
-					max-width: 625px;
-					padding-bottom: 0;
-					display: inline !important;
-					vertical-align: bottom;
-				"
-			/>
-		</div>
-		<p><br /><br /></p>
-		<table align="center" style="width: 719px">
-			<tbody>
-				<tr style="height: 104px">
-					<td style="width: 691px; height: 104px">
-						<h1 style="text-align: center">
-							<span style="color: #151f56"
-								><strong
-									><span
-										style="
-											font-size: 40px;
-											font-family: 'IBM Plex Sans';
-										"
-										>Congratulations!!</span
-									></strong
-								></span
-							>
-						</h1>
-						<h5 style="text-align: center">
-							<span style="color: #151f56"
-								><strong
-									><span
-										style="
-											font-size: 40px;
-											font-family: 'IBM Plex Sans';
-										"
-										>{{ body_text }}</span
-									></strong
-								></span
-							>
-						</h5>
-					</td>
-				</tr>
-			</tbody>
-		</table>
-		<table align="center" style="width: 160px">
-			<tbody>
-				<tr style="height: 20px">
-					<td
-						style="
-							font-family: 'IBM Plex Sans';
-							font-size: 18pt;
-							padding: 12pt;
-							background-color: #00961D;
-							color: #ffffff;
-							font-weight: bold;
-							text-align: center;
-						"
-					>
-						<a
-							href="{{ signin_link }}"
-							target="_blank"
-							style="
-								font-weight: bold;
-								letter-spacing: normal;
-								line-height: 100%;
-								text-align: center;
-								text-decoration: none;
-								color: #ffffff;
-							"
-							>Sign in</a
-						>
-					</td>
-				</tr>
-			</tbody>
-		</table>
-		<p><br /><br /><br /><br /><br /></p>
-		<div style="background-color: #f5f5f5; padding: 1px 0px 1px 0px; text-align: center; position: fixed; bottom: 0; right: 0; left: 0;">
-			<p>
-				<span
-					style="
-						color: #737581;
-						font-family: 'IBM Plex Sans';
-						font-size: 14px;
-					"
-					>Transparent Path spc</span
-				><br />
-				<span
-					style="
-						color: #737581;
-						font-family: 'IBM Plex Sans';
-						font-size: 14px;
-					"
-					>1700 Westlake Avenue North Suite 200 Seattle, WA 98109</span
-				>
-			</p>
-			<p>
-				<span
-					style="
-						color: #737581;
-						font-family: 'IBM Plex Sans';
-						font-size: 14px;
-					"
-					>Have any questions or thoughts on Transparent Path spc</span
-				><br />
-				<span
-					style="
-						color: #737581;
-						font-family: 'IBM Plex Sans';
-						font-size: 14px;
-					"
-					>Reach out to us at anytime at
-					<a
-						href="mailto:support@transparentpath.com"
-						target="_blank"
-						style="text-decoration: underline; color: #0abffc"
-						><span style="color: #0abffc">support@transparentpath.com</span></a
-					></span
-				>
-			</p>
-		</div>
-	</body>
+    <title>Welcome</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'IBM Plex Sans', Arial, sans-serif;">
+    <table role="presentation" align="center" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5; padding:40px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background-color:#ffffff; border-radius:12px;">
+            <tr>
+              <td style="padding:40px;">
+                <img
+                  alt="Transparent Path"
+                  src="https://storage.googleapis.com/tp-prod-bucket/images/tp-logo-v2.png"
+                  width="150"
+                  style="display:block; margin-bottom:28px;"
+                />
+                <h1 style="margin:0 0 16px 0; font-size:26px; font-weight:600; color:#1a1a2e;">Welcome to {{ organization_name }}</h1>
+                <p style="margin:0 0 24px 0; font-size:16px; line-height:1.5; color:#3f4254;">
+                  Your {{ role }} account on Transparent Path has been created. Sign in to start tracking shipments.
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f2ee; border-radius:10px; margin-bottom:28px;">
+                  <tr>
+                    <td style="padding:20px 24px 12px 24px;">
+                      <span style="display:block; font-size:12px; font-weight:600; letter-spacing:1px; color:#8a8d98; text-transform:uppercase;">Organization</span>
+                      <span style="display:block; font-size:17px; font-weight:600; color:#1a1a2e; padding-top:2px;">{{ organization_name }}</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 24px 20px 24px;">
+                      <span style="display:block; font-size:12px; font-weight:600; letter-spacing:1px; color:#8a8d98; text-transform:uppercase;">Your Role</span>
+                      <span style="display:block; font-size:17px; font-weight:600; color:#1a1a2e; padding-top:2px;">{{ role }}</span>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 28px auto;">
+                  <tr>
+                    <td align="center" style="background-color:#1f5c3d; border-radius:8px;">
+                      <a href="{{ signin_link }}" target="_blank" style="display:inline-block; padding:16px 40px; font-size:16px; font-weight:600; color:#ffffff; text-decoration:none;">Sign in</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 8px 0; font-size:14px; color:#3f4254;">Trouble with the button? Paste this link into your browser:</p>
+                <p style="margin:0; font-size:14px; word-break:break-all;"><a href="{{ signin_link }}" target="_blank" style="color:#1f5c3d; text-decoration:none;">{{ signin_link }}</a></p>
+                <hr style="border:none; border-top:1px solid #ececec; margin:32px 0 20px 0;" />
+                <p style="margin:0 0 6px 0; text-align:center; font-size:14px; color:#737581;">Need help? <a href="mailto:support@transparentpath.com" style="color:#1f5c3d; font-weight:600; text-decoration:none;">support@transparentpath.com</a></p>
+                <p style="margin:0; text-align:center; font-size:13px; color:#9a9ca5;">&copy; {% now "Y" %} Transparent Path spc.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
 </html>
