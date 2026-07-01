@@ -105,7 +105,7 @@ def test_make_service_request_to_unexisting_detail_endpoint(
     assert response.get('Content-Type') == 'application/json'
     assert (
         json.loads(response.content)['detail']
-        == "Endpoint not found: GET /nowhere/{id}/"
+        == "Endpoint not found: GET /nowhere/123/"
     )
 
 
@@ -295,3 +295,96 @@ def test_make_service_request_with_datamesh_list(auth_api_client, datamesh):
     item2 = data["results"][1]
     assert relationship.key in item2
     assert len(item2[relationship.key]) == 0
+
+
+@pytest.mark.django_db()
+@httpretty.activate
+def test_make_service_request_to_detail_action(auth_api_client, logic_module):
+    url = f'/{logic_module.endpoint_name}/documents/1/publish/'
+    with open(os.path.join(CURRENT_PATH, 'fixtures/swagger_documents.json')) as r:
+        swagger_body = r.read()
+    httpretty.register_uri(
+        httpretty.GET,
+        f'{logic_module.endpoint}/docs/swagger.json',
+        body=swagger_body,
+        adding_headers={'Content-Type': 'application/json'},
+    )
+    httpretty.register_uri(
+        httpretty.POST,
+        f'{logic_module.endpoint}/documents/1/publish/',
+        body='{"detail": "published"}',
+        adding_headers={'Content-Type': 'application/json'},
+        status=200,
+    )
+    response = auth_api_client.post(url, data={'foo': 'bar'}, format='json')
+    assert response.status_code == 200
+    assert json.loads(response.content)['detail'] == 'published'
+    assert httpretty.last_request().path == '/documents/1/publish/'
+
+
+@pytest.mark.django_db()
+@httpretty.activate
+def test_make_service_request_to_nested_literal_action(auth_api_client, logic_module):
+    url = f'/{logic_module.endpoint_name}/documents/published/latest/'
+    with open(os.path.join(CURRENT_PATH, 'fixtures/swagger_documents.json')) as r:
+        swagger_body = r.read()
+    httpretty.register_uri(
+        httpretty.GET,
+        f'{logic_module.endpoint}/docs/swagger.json',
+        body=swagger_body,
+        adding_headers={'Content-Type': 'application/json'},
+    )
+    httpretty.register_uri(
+        httpretty.GET,
+        f'{logic_module.endpoint}/documents/published/latest/',
+        body='{"id": "1", "file_name": "latest"}',
+        adding_headers={'Content-Type': 'application/json'},
+        status=200,
+    )
+    response = auth_api_client.get(url)
+    assert response.status_code == 200
+    assert httpretty.last_request().path == '/documents/published/latest/'
+
+
+@pytest.mark.django_db()
+@httpretty.activate
+def test_make_service_request_to_nested_subresource(auth_api_client, logic_module):
+    url = f'/{logic_module.endpoint_name}/documents/1/feature_cards/9/'
+    with open(os.path.join(CURRENT_PATH, 'fixtures/swagger_documents.json')) as r:
+        swagger_body = r.read()
+    httpretty.register_uri(
+        httpretty.GET,
+        f'{logic_module.endpoint}/docs/swagger.json',
+        body=swagger_body,
+        adding_headers={'Content-Type': 'application/json'},
+    )
+    httpretty.register_uri(
+        httpretty.DELETE,
+        f'{logic_module.endpoint}/documents/1/feature_cards/9/',
+        body='',
+        adding_headers={'Content-Type': 'application/json'},
+        status=204,
+    )
+    response = auth_api_client.delete(url)
+    assert response.status_code == 204
+    assert httpretty.last_request().path == '/documents/1/feature_cards/9/'
+
+
+@pytest.mark.django_db()
+@httpretty.activate
+def test_make_service_request_to_unexisting_detail_action(auth_api_client, logic_module):
+    url = f'/{logic_module.endpoint_name}/documents/1/nonexistent/'
+    with open(os.path.join(CURRENT_PATH, 'fixtures/swagger_documents.json')) as r:
+        swagger_body = r.read()
+    httpretty.register_uri(
+        httpretty.GET,
+        f'{logic_module.endpoint}/docs/swagger.json',
+        body=swagger_body,
+        adding_headers={'Content-Type': 'application/json'},
+    )
+    response = auth_api_client.post(url, data={'foo': 'bar'}, format='json')
+    assert response.status_code == 404
+    assert (
+        json.loads(response.content)['detail']
+        == 'Endpoint not found: POST /documents/1/nonexistent/'
+    )

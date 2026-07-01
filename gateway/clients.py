@@ -1,5 +1,6 @@
 import logging
 import json
+import re
 from typing import Any, Dict, Tuple
 
 import requests
@@ -10,7 +11,6 @@ from rest_framework.request import Request
 from rest_framework.authentication import get_authorization_header
 
 from . import exceptions
-from . import utils
 
 logger = logging.getLogger(__name__)
 
@@ -33,39 +33,69 @@ class BaseSwaggerClient:
             and not self._in_request.query_params
         )
 
+    @staticmethod
+    def _path_template_to_regex(template: str):
+        """Turn a Swagger path template (e.g. /x/{id}/y/) into a matching regex."""
+        parts = re.split(r'(\{[^}]+\})', template)
+        pattern = ''.join(
+            r'[^/]+' if p.startswith('{') and p.endswith('}') else re.escape(p)
+            for p in parts
+        )
+        return re.compile('^' + pattern.rstrip('/') + '/?$')
+
+    def _match_operation(self, spec: Spec, request_method: str, concrete_path: str):
+        """
+        Resolve the incoming concrete path (e.g. /whats_new/published/latest/) to a
+        Swagger operation by matching it against the service's declared path templates.
+        A statically-declared route wins over a {param} route.
+        """
+        paths = spec.spec_dict.get('paths', {})
+        candidates = [
+            template
+            for template in paths
+            if self._path_template_to_regex(template).match(concrete_path)
+        ]
+        # Prefer the most specific template: fewest path params, then longest.
+        candidates.sort(key=lambda t: (t.count('{'), -len(t)))
+
+        for template in candidates:
+            operation = spec.get_op_for_request(request_method, template)
+            if operation is not None:
+                return operation
+        if request_method == 'OPTIONS':
+            for template in candidates:
+                operation = spec.get_op_for_request('GET', template)
+                if operation is not None:
+                    operation.http_method = request_method
+                    return operation
+        return None
+
     def prepare_data(self, spec: Spec, **kwargs) -> Tuple[str, str]:
-        """ Parse request URL, validates operation, and returns method and URL for outgoing request"""
+        """ Parse request URL, validate operation, and return method and URL for outgoing request"""
 
-        # Parse URL kwargs
-        pk = kwargs.get('pk')
-        model = kwargs.get('model', '').lower()
-        path_kwargs = {}
-        if kwargs.get('pk') is None:
-            path = f'/{model}/'
-        else:
-            pk_name = 'uuid' if utils.valid_uuid4(pk) else 'id'
-            path_kwargs = {pk_name: pk}
-            path = f'/{model}/{{{pk_name}}}/'
+        # Reconstruct the concrete resource path relative to the service, e.g.
+        # '/whats_new/published/latest/' or '/whats_new/5/feature_cards/9/'.
+        # The gateway view passes the whole remainder as 'path'; DataMesh calls
+        # this with 'model' (+ optional 'pk') instead, so support both shapes.
+        sub_path = kwargs.get('path')
+        if sub_path is None:
+            model = (kwargs.get('model') or '').strip('/').lower()
+            pk = kwargs.get('pk')
+            sub_path = f'{model}/{pk}' if pk is not None else model
+        sub_path = sub_path.strip('/')
+        concrete_path = f'/{sub_path}/' if sub_path else '/'
 
-        # Check that operation is valid according to spec
         request_method = self._in_request.method
-        operation = spec.get_op_for_request(request_method, path)
-        if not operation:
-            if request_method == 'OPTIONS':
-                operation = spec.get_op_for_request('GET', path)
-                operation.http_method = request_method
-            else:
-                raise exceptions.EndpointNotFound(
-                    f'Endpoint not found: {self._in_request.method} {path}'
-                )
+        operation = self._match_operation(spec, request_method, concrete_path)
+        if operation is None:
+            raise exceptions.EndpointNotFound(
+                f'Endpoint not found: {request_method} {concrete_path}'
+            )
+
         method = operation.http_method.lower()
-        path_name = operation.path_name
 
-        # Build URL for the operation to request data from the service
-        url = spec.api_url.rstrip('/') + path_name
-        for k, v in path_kwargs.items():
-            url = url.replace(f'{{{k}}}', v)
-
+        # Forward the concrete path verbatim to the service
+        url = spec.api_url.rstrip('/') + concrete_path
         return method, url
 
     def get_request_data(self) -> dict:
