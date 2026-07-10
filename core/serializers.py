@@ -1,14 +1,16 @@
+import base64
+import binascii
 import jwt
+import re
 import requests
 import secrets
 
+from datetime import timedelta
 from urllib.parse import urljoin
 
 from django.contrib.auth import password_validation
-from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils import timezone
 from django.template import Template, Context
 
 from rest_framework import serializers
@@ -23,10 +25,34 @@ from core.models import (
     EmailTemplate,
     LogicModule,
     Organization,
+    PasswordResetCode,
     TEMPLATE_RESET_PASSWORD,
     OrganizationType,
     Consortium,
 )
+
+_PROFILE_PIC_DATA_URL_RE = re.compile(r'^data:image/(png|jpeg|webp);base64,(.+)$', re.IGNORECASE)
+_PROFILE_PIC_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+_PROFILE_PIC_ERROR = (
+    'profile_pic must be a base64 data URL with mime type '
+    'image/png, image/jpeg, or image/webp, and decoded size ≤ 5 MB.'
+)
+
+
+def validate_profile_pic_data_url(value):
+    """Allow empty/null (clears the field). Otherwise enforce data URL + mime + size."""
+    if value in (None, ''):
+        return value
+    match = _PROFILE_PIC_DATA_URL_RE.match(value)
+    if not match:
+        raise serializers.ValidationError(_PROFILE_PIC_ERROR)
+    try:
+        decoded = base64.b64decode(match.group(2), validate=True)
+    except (binascii.Error, ValueError):
+        raise serializers.ValidationError(_PROFILE_PIC_ERROR)
+    if len(decoded) > _PROFILE_PIC_MAX_BYTES:
+        raise serializers.ValidationError(_PROFILE_PIC_ERROR)
+    return value
 
 
 class LogicModuleSerializer(serializers.ModelSerializer):
@@ -141,8 +167,9 @@ class CoreUserSerializer(serializers.ModelSerializer):
             'user_timezone',
             'last_gdpr_shown',
             'user_language',
+            'profile_pic',
         )
-        read_only_fields = ('core_user_uuid', 'organization')
+        read_only_fields = ('core_user_uuid', 'organization', 'profile_pic')
         depth = 1
 
 
@@ -209,16 +236,25 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         coreuser.core_groups.set(core_groups)
         coreuser.save()
 
-        # create the used context for the E-mail templates
-        body_text = 'Administrator ' if 'admins' in user_role.lower() else core_groups[0].name
-        body_text += ' Account for ' + organization.name + ' was successfully created.'
+        # compute the role display name for the E-mail templates
+        role_lower = user_role.lower()
+        if 'admins' in role_lower:
+            role = 'Administrator'
+        elif role_lower == 'users' or role_lower.endswith('users'):
+            role = 'User'
+        elif user_role:
+            role = user_role[:-1] if user_role[-1].lower() == 's' else user_role
+        elif core_groups:
+            role = core_groups[0].name
+        else:
+            role = 'User'
 
         context = {
-            'signin_link': settings.FRONTEND_URL,
             'organization_name': organization.name,
-            'body_text': body_text,
+            'role': role,
+            'signin_link': settings.FRONTEND_URL,
         }
-        subject = 'Administrator Account Setup' if 'admins' in user_role.lower() else 'Account Setup'
+        subject = f"Welcome to {organization.name} on Transparent Path"
         template_name = 'email/coreuser/account_setup.txt'
         html_template_name = 'email/coreuser/account_setup.html'
         send_email(
@@ -245,6 +281,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
     user_timezone = serializers.CharField(required=False)
     user_language = serializers.CharField(required=False)
     last_gdpr_shown = serializers.DateTimeField(required=False)
+    profile_pic = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = CoreUser
@@ -262,7 +299,11 @@ class CoreUserProfileSerializer(serializers.Serializer):
             'user_timezone',
             'last_gdpr_shown',
             'user_language',
+            'profile_pic',
         )
+
+    def validate_profile_pic(self, value):
+        return validate_profile_pic_data_url(value)
 
     def update(self, instance, validated_data):
 
@@ -290,6 +331,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
         instance.user_timezone = validated_data.get('user_timezone', instance.user_timezone)
         instance.user_language = validated_data.get('user_language', instance.user_language)
         instance.last_gdpr_shown = validated_data.get('last_gdpr_shown', instance.last_gdpr_shown)
+        instance.profile_pic = validated_data.get('profile_pic', instance.profile_pic)
         password = validated_data.get('password', None)
         if password is not None:
             instance.set_password(password)
@@ -322,98 +364,54 @@ class CoreUserResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def save(self, **kwargs):
-        resetpass_url = urljoin(
-            settings.FRONTEND_URL, settings.RESETPASS_CONFIRM_URL_PATH
-        )
-        resetpass_url = resetpass_url + '{uid}/{token}/'
-
-        email = self.validated_data["email"]
+        email = self.validated_data['email']
 
         count = 0
-        for user in CoreUser.objects.filter(email=email, is_active=True):
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
+        for user in CoreUser.objects.filter(username=email, is_active=True):
+            expiry_minutes = 15
+            # Invalidate all prior unused codes for this user
+            PasswordResetCode.objects.filter(user=user, is_used=False).update(is_used=True)
+
+            # Generate a cryptographically secure 6-digit code
+            code = f'{secrets.randbelow(1_000_000):06d}'
+
+            # Persist new code with 15-minute expiry
+            PasswordResetCode.objects.create(
+                user=user,
+                code=code,
+                expires_at=timezone.now() + timedelta(minutes=expiry_minutes),
+            )
+
             context = {
-                'password_reset_link': resetpass_url.format(uid=uid, token=token),
-                'user': user,
+                'reset_password_code': code,
+                'expiry_minutes': expiry_minutes,
             }
 
-            # get specific subj and templates for user's organization
-            tpl = EmailTemplate.objects.filter(
-                organization=user.organization, type=TEMPLATE_RESET_PASSWORD
-            ).first()
-            if not tpl:
-                tpl = EmailTemplate.objects.filter(
-                    organization__name=settings.DEFAULT_ORG,
-                    type=TEMPLATE_RESET_PASSWORD,
-                ).first()
-            if tpl and tpl.template:
-                context = Context(context)
-                text_content = Template(tpl.template).render(context)
-                html_content = (
-                    Template(tpl.template_html).render(context)
-                    if tpl.template_html
-                    else None
-                )
-                count += send_email_body(email, tpl.subject, text_content, html_content, [], settings.SUPPORT_EMAIL_ADDRESS, settings.DEFAULT_FROM_EMAIL)
-                continue
-
             # default subject and templates
-            subject = 'Update Password'
+            subject = 'Verify your email'
             template_name = 'email/coreuser/password_reset.txt'
             html_template_name = 'email/coreuser/password_reset.html'
             count += send_email(
-                email, subject, context, template_name, html_template_name, cc_email_address=settings.SUPPORT_EMAIL_ADDRESS
+                user.email, subject, context, template_name, html_template_name, cc_email_address=settings.SUPPORT_EMAIL_ADDRESS
             )
 
         return count
 
 
 class CoreUserResetPasswordCheckSerializer(serializers.Serializer):
-    """Serializer for checking token for resetting password
-    """
+    """Serializer for validating 6-digit password reset code payload."""
 
-    uid = serializers.CharField()
-    token = serializers.CharField()
-
-    def validate(self, attrs):
-        # Decode the uidb64 to uid to get User object
-        try:
-            uid = force_str(urlsafe_base64_decode(attrs['uid']))
-            self.user = CoreUser.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, CoreUser.DoesNotExist):
-            raise serializers.ValidationError({'uid': ['Invalid value']})
-
-        # Check the token
-        if not default_token_generator.check_token(self.user, attrs['token']):
-            raise serializers.ValidationError({'token': ['Invalid value']})
-
-        return attrs
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
 
 
-class CoreUserResetPasswordConfirmSerializer(CoreUserResetPasswordCheckSerializer):
-    """Serializer for reset password data
-    """
+class CoreUserResetPasswordConfirmSerializer(serializers.Serializer):
+    """Serializer for 6-digit password reset confirm payload (field shape only)."""
 
+    email = serializers.EmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
     new_password1 = serializers.CharField(max_length=128)
     new_password2 = serializers.CharField(max_length=128)
-
-    def validate(self, attrs):
-
-        attrs = super().validate(attrs)
-
-        password1 = attrs.get('new_password1')
-        password2 = attrs.get('new_password2')
-        if password1 != password2:
-            raise serializers.ValidationError("The two password fields didn't match.")
-        password_validation.validate_password(password2, self.user)
-
-        return attrs
-
-    def save(self):
-        self.user.set_password(self.validated_data["new_password1"])
-        self.user.save()
-        return self.user
 
 
 class OrganizationSerializer(serializers.ModelSerializer):

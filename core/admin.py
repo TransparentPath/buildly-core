@@ -12,6 +12,7 @@ from core.models import (
     Organization,
     OrganizationType,
     Consortium,
+    PasswordResetCode,
 )
 
 
@@ -133,6 +134,10 @@ class EmailTemplateAdmin(admin.ModelAdmin):
     display = 'Email Template'
 
 
+class PasswordResetCodeAdmin(admin.ModelAdmin):
+    list_display = ('user', 'code', 'expires_at', 'is_used')
+
+
 admin.site.register(LogicModule, LogicModuleAdmin)
 admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(OrganizationType, OrganizationTypeAdmin)
@@ -142,3 +147,4 @@ admin.site.register(CoreSites, CoreSitesAdmin)
 admin.site.register(EmailTemplate, EmailTemplateAdmin)
 admin.site.register(Industry)
 admin.site.register(Consortium)
+admin.site.register(PasswordResetCode, PasswordResetCodeAdmin)

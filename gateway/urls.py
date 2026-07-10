@@ -26,8 +26,7 @@ urlpatterns = [
         rf"^(?!{'|'.join(API_GATEWAY_RESERVED_NAMES)})"  # Reject any of these
         r"async/"
         r"(?P<service>[^/?#]+)/"  # service (timetracking)
-        r"(?P<model>[^/?#]+)/?"  # model (timeevent)
-        r"(?:(?P<pk>[^?#/]+)/?)?"  # pk (numeric or UUID)
+        r"(?P<path>[^?#]*)"  # resource sub-path (model + any nested segments)
         r"(?:\?(?P<query>[^#]*))?"  # queryparams (?key1=value1&key2=value2)
         r"(?:#(?P<fragment>.*))?",  # fragment (#some-anchor)
         views.APIAsyncGatewayView.as_view(),
@@ -36,8 +35,7 @@ urlpatterns = [
     re_path(
         rf"^(?!{'|'.join(API_GATEWAY_RESERVED_NAMES)})"  # Reject any of these
         r"(?P<service>[^/?#]+)/"  # service (timetracking)
-        r"(?P<model>[^/?#]+)/?"  # model (timeevent)
-        r"(?:(?P<pk>[^?#/]+)/?)?"  # pk (numeric or UUID)
+        r"(?P<path>[^?#]*)"  # resource sub-path (model + any nested segments)
         r"(?:\?(?P<query>[^#]*))?"  # queryparams (?key1=value1&key2=value2)
         r"(?:#(?P<fragment>.*))?",  # fragment (#some-anchor)
         views.APIGatewayView.as_view(),

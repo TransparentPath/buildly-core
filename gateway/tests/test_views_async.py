@@ -298,3 +298,94 @@ def test_make_service_request_with_datamesh_list(
     item2 = data["results"][1]
     assert relationship.key in item2
     assert len(item2[relationship.key]) == 0
+
+
+@pytest.mark.django_db()
+@patch('gateway.request.aiohttp.ClientSession')
+def test_make_service_request_to_detail_action(
+    client_session_mock, auth_api_client, logic_module, event_loop
+):
+    url = f'/async/{logic_module.endpoint_name}/documents/1/publish/'
+    with open(os.path.join(CURRENT_PATH, 'fixtures/swagger_documents.json'), 'rb') as r:
+        swagger_body = r.read()
+    responses = [
+        AiohttpResponseMock(
+            method='GET',
+            url=f'{logic_module.endpoint}/docs/swagger.json',
+            status=200,
+            body=swagger_body,
+            headers={'Content-Type': 'application/json'},
+        ),
+        AiohttpResponseMock(
+            method='POST',
+            url=f'{logic_module.endpoint}/documents/1/publish/',
+            status=200,
+            body=b'{"detail": "published"}',
+            headers={'Content-Type': 'application/json'},
+        ),
+    ]
+    client_session_mock.return_value = create_aiohttp_session_mock(
+        responses, loop=event_loop
+    )
+    response = auth_api_client.post(url, data={'foo': 'bar'}, format='json')
+    assert response.status_code == 200
+    assert json.loads(response.content)['detail'] == 'published'
+
+
+@pytest.mark.django_db()
+@patch('gateway.request.aiohttp.ClientSession')
+def test_make_service_request_to_nested_subresource(
+    client_session_mock, auth_api_client, logic_module, event_loop
+):
+    url = f'/async/{logic_module.endpoint_name}/documents/1/feature_cards/9/'
+    with open(os.path.join(CURRENT_PATH, 'fixtures/swagger_documents.json'), 'rb') as r:
+        swagger_body = r.read()
+    responses = [
+        AiohttpResponseMock(
+            method='GET',
+            url=f'{logic_module.endpoint}/docs/swagger.json',
+            status=200,
+            body=swagger_body,
+            headers={'Content-Type': 'application/json'},
+        ),
+        AiohttpResponseMock(
+            method='DELETE',
+            url=f'{logic_module.endpoint}/documents/1/feature_cards/9/',
+            status=204,
+            body=b'',
+            headers={'Content-Type': 'application/json'},
+        ),
+    ]
+    client_session_mock.return_value = create_aiohttp_session_mock(
+        responses, loop=event_loop
+    )
+    response = auth_api_client.delete(url)
+    assert response.status_code == 204
+
+
+@pytest.mark.django_db()
+@patch('gateway.request.aiohttp.ClientSession')
+def test_make_service_request_to_unexisting_detail_action(
+    client_session_mock, auth_api_client, logic_module, event_loop
+):
+    url = f'/async/{logic_module.endpoint_name}/documents/1/nonexistent/'
+    with open(os.path.join(CURRENT_PATH, 'fixtures/swagger_documents.json'), 'rb') as r:
+        swagger_body = r.read()
+    responses = [
+        AiohttpResponseMock(
+            method='GET',
+            url=f'{logic_module.endpoint}/docs/swagger.json',
+            status=200,
+            body=swagger_body,
+            headers={'Content-Type': 'application/json'},
+        )
+    ]
+    client_session_mock.return_value = create_aiohttp_session_mock(
+        responses, loop=event_loop
+    )
+    response = auth_api_client.post(url, data={'foo': 'bar'}, format='json')
+    assert response.status_code == 404
+    assert (
+        json.loads(response.content)['detail']
+        == 'Endpoint not found: POST /documents/1/nonexistent/'
+    )

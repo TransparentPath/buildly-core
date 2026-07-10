@@ -73,9 +73,11 @@ class APIGatewayView(views.APIView):
         """
         Do certain validations to the request before starting to create a new request to services
         """
+        sub_path = (kwargs.get('path') or '').strip('/')
+        segments = [segment for segment in sub_path.split('/') if segment]
         if (
             request.META['REQUEST_METHOD'] in ['PUT', 'PATCH', 'DELETE']
-            and kwargs['pk'] is None
+            and len(segments) < 2
         ):
             raise exceptions.RequestValidationError('The object ID is missing.', 400)
 

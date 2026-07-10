@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.template.defaultfilters import slugify
+from django.utils import timezone
 from factory import SubFactory, Faker, LazyAttribute
 from factory.django import DjangoModelFactory
 
@@ -7,6 +10,7 @@ from core.models import (
     CoreGroup as CoreGroupM,
     LogicModule as LogicModuleM,
     Organization as OrganizationM,
+    PasswordResetCode as PasswordResetCodeM,
 )
 
 
@@ -45,3 +49,12 @@ class LogicModule(DjangoModelFactory):
 
     name = 'products'
     endpoint = 'http://products.example.com/'
+
+
+class PasswordResetCode(DjangoModelFactory):
+    class Meta:
+        model = PasswordResetCodeM
+
+    user = SubFactory(CoreUser)
+    code = '123456'
+    expires_at = LazyAttribute(lambda o: timezone.now() + timedelta(minutes=15))

@@ -313,6 +313,7 @@ class CoreUser(AbstractUser):
     user_timezone = models.CharField(blank=True, null=True, max_length=255)
     user_language = models.CharField(blank=True, null=True, max_length=255)
     last_gdpr_shown = models.DateTimeField(null=True, blank=True)
+    profile_pic = models.TextField(blank=True, null=True, help_text='Base64-encoded profile picture (data URL)')
 
     REQUIRED_FIELDS = []
 
@@ -388,6 +389,26 @@ class EmailTemplate(models.Model):
 
     def __str__(self):
         return f'{self.type} ({self.organization})'
+
+
+class PasswordResetCode(models.Model):
+    user = models.ForeignKey(
+        CoreUser,
+        on_delete=models.CASCADE,
+        related_name='password_reset_codes',
+    )
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'Password Reset Code'
+        verbose_name_plural = 'Password Reset Codes'
+
+    def is_valid(self) -> bool:
+        return not self.is_used and self.expires_at > timezone.now()
 
 
 class LogicModule(models.Model):
