@@ -27,7 +27,7 @@ from core.serializers import (
     CoreUserEmailShipmentReporSerializer,
 )
 
-from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsAnchoredOrgAdmin
+from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsAnchoredOrgAdmin, IsSelf
 from core.swagger import (
     COREUSER_INVITE_RESPONSE,
     COREUSER_INVITE_CHECK_RESPONSE,
@@ -454,6 +454,11 @@ class CoreUserViewSet(
 
             if self.action in ['update', 'partial_update', 'invite', 'destroy']:
                 return [AllowOnlyOrgAdmin(), IsAnchoredOrgAdmin()]
+
+            # update_profile edits the caller's own record only -- no
+            # org-admin or global-admin branch. See core.permissions.IsSelf.
+            if self.action == 'update_profile':
+                return [AllowAuthenticatedRead(), IsSelf()]
 
         return super(CoreUserViewSet, self).get_permissions()
 

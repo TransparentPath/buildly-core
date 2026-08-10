@@ -198,3 +198,26 @@ class IsAnchoredOrgAdmin(permissions.BasePermission):
         return Organization.objects.filter(name=name).values_list(
             'pk', flat=True
         ).first()
+
+
+class IsSelf(permissions.BasePermission):
+    """
+    Restrict a CoreUser action to the caller's own record. Self only --
+    deliberately no org-admin or global-admin branch, unlike
+    `IsAnchoredOrgAdmin` above.
+
+    Used for `update_profile`. `has_permission` stays at "authenticated";
+    the real check happens in `has_object_permission`, which
+    `update_profile` is guaranteed to reach because it calls
+    `self.get_object()` before mutating anything. Judging against `obj`
+    (the stored instance) rather than the request body is what lets the
+    organization switcher PATCH the caller's own pk while deliberately
+    sending a *different* organization in the payload -- that is how
+    switching works, and it must keep working.
+    """
+
+    def has_permission(self, request, view):
+        return not request.user.is_anonymous and request.user.is_active
+
+    def has_object_permission(self, request, view, obj):
+        return obj.pk == request.user.pk
