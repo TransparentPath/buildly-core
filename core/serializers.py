@@ -311,6 +311,61 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         return coreuser
 
 
+def _resolve_organization_switch(user, organization_name):
+    """
+    Resolve an incoming `organization_name` against the entitlement rule for
+    the organization switcher (`CoreUserProfileSerializer.update`).
+
+    Returns `(organization, is_switch)`:
+      - `organization` is `None` when the name matches no organization at
+        all -- this is left exactly as before: a silently ignored no-op,
+        not an error, so a stale name from a caller never breaks the rest
+        of the payload.
+      - `is_switch` is `False` when the resolved organization is the one
+        `user` is already in. This is the common case in real traffic --
+        several frontend call sites re-send the user's own organization
+        name on every profile save purely to satisfy this field -- and it
+        must stay a no-op, not a switch subject to the entitlement check.
+      - `is_switch` is `True` only for an actual change of organization;
+        the caller must check entitlement before applying it.
+    """
+    organization = Organization.objects.filter(name=organization_name).first()
+    if organization is None:
+        return None, False
+    return organization, organization.pk != user.organization_id
+
+
+def _is_entitled_to_switch_into(user, organization):
+    """
+    Whether `user` may switch into `organization` via the profile
+    organization switcher:
+
+      - a global admin or superuser may switch into any organization
+        (resolved first and unconditionally -- a global admin has no
+        org-level admin role to anchor to, so an anchor-first check would
+        otherwise refuse them everywhere; mirrors
+        `core.permissions.IsAnchoredOrgAdmin`);
+      - anyone else is anchored to the organization(s) their own org-admin
+        CoreGroup(s) belong to (`CoreUser.org_admin_organization_ids`),
+        plus -- for a reseller anchor -- that reseller's customer
+        organizations (`Organization.reseller_customer_orgs`), mirroring
+        the meaning `OrganizationViewSet.list` already gives the reseller
+        tree;
+      - an ordinary user (no anchor at all) may switch nowhere.
+    """
+    if user.is_superuser or user.is_global_admin:
+        return True
+
+    anchor_ids = user.org_admin_organization_ids
+    if organization.pk in anchor_ids:
+        return True
+
+    target_pk = str(organization.pk)
+    return Organization.objects.filter(
+        pk__in=anchor_ids, is_reseller=True, reseller_customer_orgs__contains=[target_pk]
+    ).exists()
+
+
 class CoreUserProfileSerializer(serializers.Serializer):
     """ Let's user update his first_name,last_name,title,contact_info,
     password and organization_name """
@@ -364,16 +419,29 @@ class CoreUserProfileSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {'current_password': 'Current password is incorrect.'}
                 )
+
+        organization_name = data.get('organization_name')
+        if organization_name:
+            organization, is_switch = _resolve_organization_switch(self.instance, organization_name)
+            if is_switch and not _is_entitled_to_switch_into(self.instance, organization):
+                raise serializers.ValidationError(
+                    {'organization_name': 'You are not entitled to switch into this organization.'}
+                )
         return data
 
     def update(self, instance, validated_data):
 
-        organization_name = validated_data.pop('organization_name')
-
-        name = Organization.objects.filter(name=organization_name).first()
-        if name is not None:
-            instance.organization = name
-            instance.organization_name = name
+        # Re-resolve rather than reusing validate()'s result: nothing may be
+        # saved on a refused switch (raising above already ensures that),
+        # and re-deriving here keeps this method self-sufficient. A name
+        # matching no organization is left exactly as before -- silently
+        # ignored, not an error.
+        organization_name = validated_data.pop('organization_name', None)
+        if organization_name:
+            organization, _ = _resolve_organization_switch(instance, organization_name)
+            if organization is not None:
+                instance.organization = organization
+                instance.organization_name = organization
 
         instance.first_name = validated_data.get('first_name', instance.first_name)
         instance.last_name = validated_data.get('last_name', instance.last_name)

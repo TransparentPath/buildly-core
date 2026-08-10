@@ -297,12 +297,35 @@ class TestJoiningUnrelatedOrgGrantsNoAdminAuthority:
     """Acceptance criterion 5 -- the wider escalation the anchor closes as a
     side effect: an admin who joins an unrelated organization by name (not
     even a reseller/customer relationship) gains no admin authority over
-    it."""
+    it.
 
-    def test_switched_in_org_admin_cannot_manage_unrelated_org_users(
+    tp-core-switch-scope, 2026-08-10: the switcher itself now enforces this
+    same entitlement server-side (`CoreUserProfileSerializer`), so a plain
+    org admin can no longer switch into an unrelated organization at all --
+    the first test below now asserts exactly that, refused at the switch.
+    That leaves the original claim of this class -- that the anchor holds
+    even for a user who *is* inside another organization -- with nothing
+    left to exercise via the switcher. The second test below rebuilds that
+    state directly on the model (bypassing the switcher entirely) so the
+    permission layer keeps independent coverage of the anchor, regardless
+    of how a user came to sit in another organization."""
+
+    def test_org_admin_cannot_switch_into_unrelated_org(
+        self, api_client, org_admin, unrelated_org
+    ):
+        response = switch_into(api_client, org_admin, unrelated_org)
+        assert response.status_code == 400
+        assert org_admin.organization_id != unrelated_org.pk
+
+    def test_org_admin_inside_unrelated_org_still_has_no_admin_authority(
         self, api_client, org_admin, unrelated_org, unrelated_org_user
     ):
-        switch_into(api_client, org_admin, unrelated_org)
+        # Bypasses the switcher on purpose -- see class docstring -- so this
+        # exercises IsAnchoredOrgAdmin alone, independent of whether the
+        # switch that produced this state would itself be permitted today.
+        org_admin.organization = unrelated_org
+        org_admin.save()
+        api_client.force_authenticate(user=org_admin)
 
         response = api_client.delete(
             reverse('coreuser-detail', args=(unrelated_org_user.pk,))
