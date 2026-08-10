@@ -320,6 +320,7 @@ class CoreUserProfileSerializer(serializers.Serializer):
     title = serializers.CharField(required=False)
     contact_info = serializers.CharField(required=False)
     password = serializers.CharField(required=False)
+    current_password = serializers.CharField(required=False, write_only=True)
     organization_name = serializers.CharField(required=False)
     geo_alert_preferences = serializers.JSONField(required=False)
     env_alert_preferences = serializers.JSONField(required=False)
@@ -351,6 +352,19 @@ class CoreUserProfileSerializer(serializers.Serializer):
 
     def validate_profile_pic(self, value):
         return validate_profile_pic_data_url(value)
+
+    def validate(self, data):
+        if 'password' in data:
+            current_password = data.get('current_password')
+            if not current_password:
+                raise serializers.ValidationError(
+                    {'current_password': 'This field is required.'}
+                )
+            if not self.instance.check_password(current_password):
+                raise serializers.ValidationError(
+                    {'current_password': 'Current password is incorrect.'}
+                )
+        return data
 
     def update(self, instance, validated_data):
 

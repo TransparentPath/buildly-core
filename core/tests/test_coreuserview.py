@@ -1064,3 +1064,95 @@ class TestUpdateProfilePic:
         assert response.status_code == 200
         user.refresh_from_db()
         assert user.profile_pic == TINY_PNG_DATA_URL
+
+
+@pytest.mark.django_db()
+class TestUpdateProfileCurrentPassword:
+    """Tests requiring current_password to change password via update_profile."""
+
+    OLD_PASSWORD = 'OldPass123!'
+    NEW_PASSWORD = 'NewPass456!'
+
+    def _patch_update_profile(self, request_factory, user, data):
+        """Helper: PATCH /coreuser/<pk>/update_profile/ as the user themselves."""
+        pk = user.pk
+        request = request_factory.patch(
+            reverse('coreuser-update-profile', args=(pk,)), data, format='json'
+        )
+        request.user = user
+        return CoreUserViewSet.as_view({'patch': 'update_profile'})(request, pk=pk)
+
+    def test_update_profile_password_with_correct_current_password(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'current_password': self.OLD_PASSWORD,
+            'password': self.NEW_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.check_password(self.NEW_PASSWORD)
+
+    def test_update_profile_password_with_wrong_current_password(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'current_password': 'not-the-right-password',
+            'password': self.NEW_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 400
+        org_member.refresh_from_db()
+        assert org_member.check_password(self.OLD_PASSWORD)
+
+    def test_update_profile_password_without_current_password(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'password': self.NEW_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 400
+        org_member.refresh_from_db()
+        assert org_member.check_password(self.OLD_PASSWORD)
+
+    def test_update_profile_field_change_without_password_is_unaffected(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'first_name': 'Changed',
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.first_name == 'Changed'
+        assert org_member.check_password(self.OLD_PASSWORD)
+
+    def test_update_profile_current_password_alone_is_ignored(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'current_password': self.OLD_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.check_password(self.OLD_PASSWORD)
+
+    def test_update_profile_current_password_not_in_response(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'current_password': self.OLD_PASSWORD,
+            'password': self.NEW_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        assert 'current_password' not in response.data
