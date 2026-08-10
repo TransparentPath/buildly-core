@@ -85,10 +85,15 @@ if [ "$ci" = true ] ; then
     fi
     coverage report -m
 else
+    # No --pdb here. This is the path CI uses (unit_test.yml passes --keepdb), and
+    # --pdb drops into an interactive IPython debugger on the FIRST failure; in a
+    # non-interactive container it reads EOF and quits the session, so the run
+    # reported on 5 of 368 tests and hid the other 33. Pass --pdb explicitly on the
+    # command line when debugging locally.
     if [ "$keepdb" = true ] ; then
-        pytest --log-level=2 --pdb --pdbcls=IPython.terminal.debugger:Pdb --reuse-db
+        pytest --log-level=2 --reuse-db
     else
-        pytest --log-level=2 --pdb --pdbcls=IPython.terminal.debugger:Pdb
+        pytest --log-level=2
     fi
     if [ $? -eq 1 ] && [ "$bash_on_finish" = true ]; then
         bash_on_failure

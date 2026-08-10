@@ -57,6 +57,114 @@ def test_coreuser_views_permissions_unauth(request_factory):
     response = CoreUserViewSet.as_view({'patch': 'partial_update'})(request, pk=1)
     assert response.status_code == 403
 
+    # has no permission
+    request = request_factory.delete(reverse('coreuser-detail', args=(1,)))
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=1)
+    assert response.status_code == 403
+
+    # has no permission
+    request = request_factory.patch(reverse('coreuser-update-profile', args=(1,)))
+    response = CoreUserViewSet.as_view({'patch': 'update_profile'})(request, pk=1)
+    assert response.status_code == 403
+
+    # has no permission
+    request = request_factory.get(reverse('coreuser-me'))
+    response = CoreUserViewSet.as_view({'get': 'me'})(request)
+    assert response.status_code == 403
+
+    # has no permission
+    for action_ in ('alert', 'status_alert', 'battery_alert', 'email_shipment_report'):
+        request = request_factory.post(reverse(f'coreuser-{action_.replace("_", "-")}'))
+        response = CoreUserViewSet.as_view({'post': action_})(request)
+        assert response.status_code == 403, action_
+
+
+@pytest.mark.django_db()
+def test_coreuser_alert_authenticated_still_allowed(request_factory, org_member):
+    """
+    Service-to-service callers (pushnotification_service) authenticate with a
+    Bearer token, so closing the alert endpoints must not break them.
+    """
+    request = request_factory.post(
+        reverse('coreuser-alert'),
+        {'organization_uuid': str(org_member.organization.organization_uuid),
+         'messages': []},
+        format='json',
+    )
+    request.user = org_member
+    response = CoreUserViewSet.as_view({'post': 'alert'})(request)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db()
+def test_coreuser_destroy_anonymous_does_not_delete(request_factory, org_member):
+    """An anonymous DELETE must be refused and must not delete the user."""
+    pk = org_member.pk
+    request = request_factory.delete(reverse('coreuser-detail', args=(pk,)))
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=pk)
+    assert response.status_code == 403
+    assert CoreUser.objects.filter(pk=pk).exists()
+
+
+@pytest.mark.django_db()
+def test_coreuser_destroy_org_member_forbidden(request_factory, org_member, org):
+    """An authenticated non-admin cannot delete another user in their own org."""
+    victim = factories.CoreUser.create(
+        organization=org, username='victim@example.com', email='victim@example.com'
+    )
+    request = request_factory.delete(reverse('coreuser-detail', args=(victim.pk,)))
+    request.user = org_member
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=victim.pk)
+    assert response.status_code == 403
+    assert CoreUser.objects.filter(pk=victim.pk).exists()
+
+
+@pytest.mark.django_db()
+def test_coreuser_destroy_org_admin_same_org_succeeds(request_factory, org_admin, org):
+    """An org admin can delete a user inside their own organization."""
+    victim = factories.CoreUser.create(
+        organization=org, username='victim2@example.com', email='victim2@example.com'
+    )
+    request = request_factory.delete(reverse('coreuser-detail', args=(victim.pk,)))
+    request.user = org_admin
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=victim.pk)
+    assert response.status_code == 204
+    assert not CoreUser.objects.filter(pk=victim.pk).exists()
+
+
+@pytest.mark.django_db()
+def test_coreuser_destroy_org_admin_other_org_forbidden(request_factory, org_admin):
+    """An org admin cannot delete a user belonging to a different organization."""
+    other_org = factories.Organization.create(name='Some Other Org')
+    victim = factories.CoreUser.create(
+        organization=other_org,
+        username='outsider@example.com',
+        email='outsider@example.com',
+    )
+    request = request_factory.delete(reverse('coreuser-detail', args=(victim.pk,)))
+    request.user = org_admin
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=victim.pk)
+    assert response.status_code == 403
+    assert CoreUser.objects.filter(pk=victim.pk).exists()
+
+
+@pytest.mark.django_db()
+def test_coreuser_update_profile_anonymous_forbidden(request_factory, org_member):
+    """An anonymous PATCH of update_profile must be refused."""
+    org_member.first_name = 'Untouched'
+    org_member.save()
+    request = request_factory.patch(
+        reverse('coreuser-update-profile', args=(org_member.pk,)),
+        {'organization_name': org_member.organization.name, 'first_name': 'Hacked'},
+        format='json',
+    )
+    response = CoreUserViewSet.as_view({'patch': 'update_profile'})(
+        request, pk=org_member.pk
+    )
+    assert response.status_code == 403
+    org_member.refresh_from_db()
+    assert org_member.first_name == 'Untouched'
+
 
 @pytest.mark.django_db()
 def test_coreuser_views_permissions_org_member(request_factory, org_member):
@@ -119,7 +227,7 @@ class TestCoreUserCreate:
         # check this user is org admin
         assert user.is_org_admin
 
-    def test_registration_of_second_org_user(self, request_factory, org_admin):
+    def test_registration_of_second_org_user(self, request_factory, org_admin, mock_uom_lookup):
         request = request_factory.post(reverse('coreuser-list'), TEST_USER_DATA)
         response = CoreUserViewSet.as_view({'post': 'create'})(request)
         assert response.status_code == 201
@@ -134,7 +242,7 @@ class TestCoreUserCreate:
         # check this user is org admin as well
         assert user.is_org_admin
 
-    def test_registration_of_invited_org_user(self, request_factory, org_admin):
+    def test_registration_of_invited_org_user(self, request_factory, org_admin, mock_uom_lookup):
         data = TEST_USER_DATA.copy()
         token = create_invitation_token(data['email'], org_admin.organization, data['user_role'])
         data['invitation_token'] = token
@@ -173,6 +281,110 @@ class TestCoreUserCreate:
         request = request_factory.post(reverse('coreuser-list'), data)
         response = CoreUserViewSet.as_view({'post': 'create'})(request)
         assert response.status_code == 400
+
+    def test_invited_registration_cannot_override_organization_and_role(
+        self, request_factory, org_admin, mock_uom_lookup
+    ):
+        # tp-core-invite-binding: a valid invitation to org_admin's organization
+        # as "Users" must not let the body redirect registration into a
+        # different organization as "Admins" of that organization.
+        other_org = factories.Organization(name='Other Org')
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'invited-escalation@example.com'
+        data['email'] = 'invited-escalation@example.com'
+        token = create_invitation_token(data['email'], org_admin.organization, 'Users')
+        data['invitation_token'] = token
+        data['organization_name'] = other_org.name
+        data['user_role'] = 'Admins'
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+
+        assert response.status_code == 400
+        assert not CoreUser.objects.filter(username=data['username']).exists()
+
+    def test_invited_registration_honours_token_role_and_organization(
+        self, request_factory, org_admin, mock_uom_lookup
+    ):
+        # Positive control: registering with exactly the token's own
+        # organization and role still works, and is not over-blocked.
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'invited-honest@example.com'
+        data['email'] = 'invited-honest@example.com'
+        data['user_role'] = 'Users'
+        token = create_invitation_token(data['email'], org_admin.organization, 'Users')
+        data['invitation_token'] = token
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+        assert response.status_code == 201
+
+        user = CoreUser.objects.get(username=data['username'])
+        assert user.organization == org_admin.organization
+        assert user.core_groups.filter(name='Users').exists()
+        assert user.is_active
+        assert not user.is_org_admin
+
+    def test_invited_registration_roleless_invite_cannot_gain_role_from_body(
+        self, request_factory, org_admin, mock_uom_lookup
+    ):
+        # perform_invite defaults user_role to [] (falsy) when the inviter leaves
+        # it blank. A field the token does not carry must not be supplied by the
+        # body either, so the body cannot use a role-less invite to pick "Admins".
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'invited-roleless-escalation@example.com'
+        data['email'] = 'invited-roleless-escalation@example.com'
+        token = create_invitation_token(data['email'], org_admin.organization, [])
+        data['invitation_token'] = token
+        data['user_role'] = 'Admins'
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+
+        assert response.status_code == 400
+        assert not CoreUser.objects.filter(username=data['username']).exists()
+
+    def test_invited_registration_roleless_invite_gets_default_group(
+        self, request_factory, org_admin, mock_uom_lookup
+    ):
+        # Positive control for the role-less invite: honouring it (i.e. not
+        # supplying a role) still registers the user, and CoreUser.save()'s
+        # existing default-group assignment gives them the org's default
+        # (Users) role rather than no role or an escalated one.
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'invited-roleless-honest@example.com'
+        data['email'] = 'invited-roleless-honest@example.com'
+        data.pop('user_role', None)
+        token = create_invitation_token(data['email'], org_admin.organization, [])
+        data['invitation_token'] = token
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+        assert response.status_code == 201
+
+        user = CoreUser.objects.get(username=data['username'])
+        assert user.is_active
+        assert not user.is_org_admin
+        assert user.core_groups.filter(name='Users', is_default=True).exists()
+
+    def test_tokenless_registration_unaffected_by_invite_binding(self, request_factory, org_admin, mock_uom_lookup):
+        # tp-core-invite-binding must not touch the no-token self-signup path:
+        # an unrecognised organization_name still creates a new organization,
+        # and the resulting account is still active as before.
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'self-signup@example.com'
+        data['email'] = 'self-signup@example.com'
+        data['organization_name'] = 'Brand New Self-Signup Org'
+        data['user_role'] = 'Admins'
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+        assert response.status_code == 201
+
+        user = CoreUser.objects.get(username=data['username'])
+        assert user.organization.name == data['organization_name']
+        assert user.is_active
+        assert user.is_org_admin
 
 
 @pytest.mark.django_db()
@@ -852,3 +1064,95 @@ class TestUpdateProfilePic:
         assert response.status_code == 200
         user.refresh_from_db()
         assert user.profile_pic == TINY_PNG_DATA_URL
+
+
+@pytest.mark.django_db()
+class TestUpdateProfileCurrentPassword:
+    """Tests requiring current_password to change password via update_profile."""
+
+    OLD_PASSWORD = 'OldPass123!'
+    NEW_PASSWORD = 'NewPass456!'
+
+    def _patch_update_profile(self, request_factory, user, data):
+        """Helper: PATCH /coreuser/<pk>/update_profile/ as the user themselves."""
+        pk = user.pk
+        request = request_factory.patch(
+            reverse('coreuser-update-profile', args=(pk,)), data, format='json'
+        )
+        request.user = user
+        return CoreUserViewSet.as_view({'patch': 'update_profile'})(request, pk=pk)
+
+    def test_update_profile_password_with_correct_current_password(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'current_password': self.OLD_PASSWORD,
+            'password': self.NEW_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.check_password(self.NEW_PASSWORD)
+
+    def test_update_profile_password_with_wrong_current_password(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'current_password': 'not-the-right-password',
+            'password': self.NEW_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 400
+        org_member.refresh_from_db()
+        assert org_member.check_password(self.OLD_PASSWORD)
+
+    def test_update_profile_password_without_current_password(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'password': self.NEW_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 400
+        org_member.refresh_from_db()
+        assert org_member.check_password(self.OLD_PASSWORD)
+
+    def test_update_profile_field_change_without_password_is_unaffected(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'first_name': 'Changed',
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.first_name == 'Changed'
+        assert org_member.check_password(self.OLD_PASSWORD)
+
+    def test_update_profile_current_password_alone_is_ignored(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'current_password': self.OLD_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        org_member.refresh_from_db()
+        assert org_member.check_password(self.OLD_PASSWORD)
+
+    def test_update_profile_current_password_not_in_response(self, request_factory, org_member):
+        org_member.set_password(self.OLD_PASSWORD)
+        org_member.save()
+        data = {
+            'organization_name': org_member.organization.name,
+            'current_password': self.OLD_PASSWORD,
+            'password': self.NEW_PASSWORD,
+        }
+        response = self._patch_update_profile(request_factory, org_member, data)
+        assert response.status_code == 200
+        assert 'current_password' not in response.data

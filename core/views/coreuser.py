@@ -27,7 +27,7 @@ from core.serializers import (
     CoreUserEmailShipmentReporSerializer,
 )
 
-from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsOrgMember
+from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsAnchoredOrgAdmin, IsSelf
 from core.swagger import (
     COREUSER_INVITE_RESPONSE,
     COREUSER_INVITE_CHECK_RESPONSE,
@@ -120,14 +120,13 @@ class CoreUserViewSet(
         return Response(serializer.data)
     
     def destroy(self, request, *args, **kwargs):
-        if AllowOnlyOrgAdmin():
-            user = self.get_object()
-            user.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        else:
-            return Response(
-                {'detail': 'Does not have permissions to perform the specified action.'}, status.HTTP_401_UNAUTHORIZED
-            )
+        # Authorization is enforced by get_permissions() (AllowOnlyOrgAdmin +
+        # IsAnchoredOrgAdmin) and, via get_object(), by IsAnchoredOrgAdmin's
+        # object-level check, which confines an org admin to users in the
+        # organization their own admin role belongs to.
+        user = self.get_object()
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=['GET'], detail=False)
     def me(self, request, *args, **kwargs):
@@ -450,14 +449,16 @@ class CoreUserViewSet(
                 'reset_password_check',
                 'reset_password_confirm',
                 'invite_check',
-                'update_profile',
             ]:
                 return [permissions.AllowAny()]
 
-            if self.action in ['update', 'partial_update', 'invite']:
-                return [AllowOnlyOrgAdmin(), IsOrgMember()]
-            if self.action in ['invite']:
-                return [AllowOnlyOrgAdmin(), IsOrgMember()]
+            if self.action in ['update', 'partial_update', 'invite', 'destroy']:
+                return [AllowOnlyOrgAdmin(), IsAnchoredOrgAdmin()]
+
+            # update_profile edits the caller's own record only -- no
+            # org-admin or global-admin branch. See core.permissions.IsSelf.
+            if self.action == 'update_profile':
+                return [AllowAuthenticatedRead(), IsSelf()]
 
         return super(CoreUserViewSet, self).get_permissions()
 

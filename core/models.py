@@ -349,6 +349,28 @@ class CoreUser(AbstractUser):
         return self._is_org_admin
 
     @property
+    def org_admin_organization_ids(self) -> set:
+        """
+        Organization ids this user's org-admin CoreGroup(s) belong to.
+
+        `is_org_admin` is a person-level flag: it says nothing about which
+        organization the admin role belongs to, so it stays true after the
+        user's own `organization` changes (e.g. via the organization
+        switcher). Admin *authority* over a given user must instead be
+        anchored to this set rather than to `organization_id`, or a user who
+        is merely a member of an organization would appear to administer it.
+        A user may hold more than one org-admin group, or none; this returns
+        the full set rather than picking one arbitrarily.
+        """
+        if not hasattr(self, '_org_admin_organization_ids'):
+            self._org_admin_organization_ids = set(
+                self.core_groups.filter(
+                    permissions=PERMISSIONS_ORG_ADMIN, is_org_level=True
+                ).values_list('organization_id', flat=True)
+            )
+        return self._org_admin_organization_ids
+
+    @property
     def is_global_admin(self) -> bool:
         """
         Check if user has organization level admin permissions
