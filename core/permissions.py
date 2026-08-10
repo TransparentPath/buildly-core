@@ -1,3 +1,4 @@
+import json
 import logging
 
 from rest_framework import permissions
@@ -129,3 +130,71 @@ class IsOrgMember(permissions.BasePermission):
         except AttributeError:
             pass
         return False
+
+
+class IsAnchoredOrgAdmin(permissions.BasePermission):
+    """
+    Admin authority over a CoreUser is anchored to the organization the
+    acting user's own org-admin CoreGroup belongs to -- not to whichever
+    organization the acting user currently sits in.
+
+    Without this, a user who merely joins an organization (for instance a
+    reseller admin switched into a customer organization via the
+    organization switcher) would appear to administer it, because
+    `CoreUser.is_org_admin` and `organization_id` are both person-level and
+    carry no memory of which organization granted the admin role. This
+    mirrors the derivation `OrganizationViewSet.list` already uses
+    (`core/views/organization.py`), applied at the object level instead of
+    for list-scoping.
+
+    Used only for the CoreUser actions that act on an existing or
+    about-to-exist user: update, partial_update, destroy (object-level) and
+    invite (has_permission, since no object exists yet). It does not affect
+    list/retrieve visibility, which is intentionally wider for reseller
+    admins and is untouched.
+    """
+
+    def has_permission(self, request, view):
+        if request.user.is_anonymous or not request.user.is_active:
+            return False
+
+        if request.user.is_superuser or request.user.is_global_admin:
+            return True
+
+        if getattr(view, 'action', None) == 'invite':
+            target_org_id = self._invite_target_organization_id(request)
+            return target_org_id in request.user.org_admin_organization_ids
+
+        # For update/partial_update/destroy the target does not exist yet
+        # at this point; has_object_permission below does the real check.
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_active and request.user.is_global_admin:
+            return True
+
+        target_org_id = getattr(obj, 'organization_id', None)
+        return target_org_id in request.user.org_admin_organization_ids
+
+    @staticmethod
+    def _invite_target_organization_id(request):
+        """
+        Resolve the organization `invite` would create the invitation
+        under, mirroring how `CoreUserViewSet.perform_invite` reads
+        `org_data` from the request, so it can be checked against the
+        anchor before any invitation is sent.
+        """
+        org_data = request.data.get('org_data')
+        if isinstance(org_data, str):
+            try:
+                org_data = json.loads(org_data)
+            except (TypeError, ValueError):
+                return None
+        if not isinstance(org_data, dict):
+            return None
+        name = org_data.get('name')
+        if not name:
+            return None
+        return Organization.objects.filter(name=name).values_list(
+            'pk', flat=True
+        ).first()

@@ -27,7 +27,7 @@ from core.serializers import (
     CoreUserEmailShipmentReporSerializer,
 )
 
-from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsOrgMember
+from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsAnchoredOrgAdmin
 from core.swagger import (
     COREUSER_INVITE_RESPONSE,
     COREUSER_INVITE_CHECK_RESPONSE,
@@ -121,8 +121,9 @@ class CoreUserViewSet(
     
     def destroy(self, request, *args, **kwargs):
         # Authorization is enforced by get_permissions() (AllowOnlyOrgAdmin +
-        # IsOrgMember) and, via get_object(), by IsOrgMember's object-level check
-        # which confines an org admin to users in their own organization.
+        # IsAnchoredOrgAdmin) and, via get_object(), by IsAnchoredOrgAdmin's
+        # object-level check, which confines an org admin to users in the
+        # organization their own admin role belongs to.
         user = self.get_object()
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -452,7 +453,7 @@ class CoreUserViewSet(
                 return [permissions.AllowAny()]
 
             if self.action in ['update', 'partial_update', 'invite', 'destroy']:
-                return [AllowOnlyOrgAdmin(), IsOrgMember()]
+                return [AllowOnlyOrgAdmin(), IsAnchoredOrgAdmin()]
 
         return super(CoreUserViewSet, self).get_permissions()
 
