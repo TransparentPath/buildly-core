@@ -138,10 +138,39 @@ class CoreUserSerializer(serializers.ModelSerializer):
             coreuser_exists = CoreUser.objects.filter(email=decoded['email']).exists()
             if coreuser_exists or decoded['email'] != self.initial_data['email']:
                 raise serializers.ValidationError('Token is not valid.')
+
+            # The invitation binds organization and role; the request body
+            # may not override them. Reject outright rather than silently
+            # overriding, so a body/token conflict surfaces as a client error.
+            # A field the token does not carry (perform_invite defaults
+            # user_role to []) must not be supplied by the body either -
+            # otherwise a role-less/org-less invite would let the body pick
+            # any value with no token value ever contradicting it.
+            # CoreUser.save() already assigns the organization's default
+            # group when no role was set, so a role-less invite correctly
+            # yields the default (Users) role on its own.
+            token_organization_name = decoded.get('organization_name')
+            body_organization_name = self.initial_data.get('organization_name')
+            if token_organization_name:
+                if body_organization_name and body_organization_name != token_organization_name:
+                    raise serializers.ValidationError('organization_name does not match the invitation.')
+            elif body_organization_name:
+                raise serializers.ValidationError('organization_name is not permitted by this invitation.')
+
+            token_user_role = decoded.get('user_role')
+            body_user_role = self.initial_data.get('user_role')
+            if token_user_role:
+                if body_user_role and body_user_role != token_user_role:
+                    raise serializers.ValidationError('user_role does not match the invitation.')
+            elif body_user_role:
+                raise serializers.ValidationError('user_role is not permitted by this invitation.')
         except jwt.DecodeError:
             raise serializers.ValidationError('Token is not valid.')
         except jwt.ExpiredSignatureError:
             raise serializers.ValidationError('Token is expired.')
+        # Stash the decoded payload so create() derives organization/role from
+        # the token itself, not merely from a body value that passed the check above.
+        self._invitation_payload = decoded
         return value
 
     class Meta:
@@ -191,21 +220,34 @@ class CoreUserWritableSerializer(CoreUserSerializer):
         read_only_fields = CoreUserSerializer.Meta.read_only_fields
 
     def create(self, validated_data):
-        # get or create organization
-        try:
-            organization = validated_data.pop('organization')
-        except (KeyError):
-            organization = {'name': settings.DEFAULT_ORG}
-        organization, is_new_org = Organization.objects.get_or_create(**organization)
-
         core_groups = validated_data.pop('core_groups', [])
         user_role = validated_data.pop('user_role', '')
+        invitation_token = validated_data.pop('invitation_token', None)
+        organization = validated_data.pop('organization', None)
+
+        # On an invited registration, organization and role come from the
+        # signed token, not from the request body: the body cannot override
+        # them. validate_invitation_token() already rejects a conflicting
+        # body value; this also covers the case where the body simply omits
+        # them and the token value must still apply.
+        invitation_payload = getattr(self, '_invitation_payload', None)
+        if invitation_payload:
+            token_organization_name = invitation_payload.get('organization_name')
+            if token_organization_name:
+                organization = {'name': token_organization_name}
+            token_user_role = invitation_payload.get('user_role')
+            if token_user_role:
+                user_role = token_user_role
+
+        # get or create organization
+        if organization is None:
+            organization = {'name': settings.DEFAULT_ORG}
+        organization, is_new_org = Organization.objects.get_or_create(**organization)
 
         if user_role:
             core_groups = CoreGroup.objects.filter(name=user_role, organization=organization.organization_uuid)
 
         # create core user
-        invitation_token = validated_data.pop('invitation_token', None)
         validated_data['is_active'] = is_new_org or bool(invitation_token)
         coreuser = CoreUser.objects.create(organization=organization, **validated_data)
 
@@ -233,7 +275,12 @@ class CoreUserWritableSerializer(CoreUserSerializer):
             coreuser.user_timezone = default_timezone
             coreuser.user_language = default_language
 
-        coreuser.core_groups.set(core_groups)
+        # Only overwrite groups when the request actually named a role/group -
+        # CoreUser.save() (above) already assigned the organization's default
+        # group, and an empty .set() here would wipe that out for a role-less
+        # invite instead of leaving the default group in place.
+        if core_groups:
+            coreuser.core_groups.set(core_groups)
         coreuser.save()
 
         # compute the role display name for the E-mail templates

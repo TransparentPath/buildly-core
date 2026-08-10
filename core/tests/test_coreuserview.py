@@ -282,6 +282,110 @@ class TestCoreUserCreate:
         response = CoreUserViewSet.as_view({'post': 'create'})(request)
         assert response.status_code == 400
 
+    def test_invited_registration_cannot_override_organization_and_role(
+        self, request_factory, org_admin, mock_uom_lookup
+    ):
+        # tp-core-invite-binding: a valid invitation to org_admin's organization
+        # as "Users" must not let the body redirect registration into a
+        # different organization as "Admins" of that organization.
+        other_org = factories.Organization(name='Other Org')
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'invited-escalation@example.com'
+        data['email'] = 'invited-escalation@example.com'
+        token = create_invitation_token(data['email'], org_admin.organization, 'Users')
+        data['invitation_token'] = token
+        data['organization_name'] = other_org.name
+        data['user_role'] = 'Admins'
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+
+        assert response.status_code == 400
+        assert not CoreUser.objects.filter(username=data['username']).exists()
+
+    def test_invited_registration_honours_token_role_and_organization(
+        self, request_factory, org_admin, mock_uom_lookup
+    ):
+        # Positive control: registering with exactly the token's own
+        # organization and role still works, and is not over-blocked.
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'invited-honest@example.com'
+        data['email'] = 'invited-honest@example.com'
+        data['user_role'] = 'Users'
+        token = create_invitation_token(data['email'], org_admin.organization, 'Users')
+        data['invitation_token'] = token
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+        assert response.status_code == 201
+
+        user = CoreUser.objects.get(username=data['username'])
+        assert user.organization == org_admin.organization
+        assert user.core_groups.filter(name='Users').exists()
+        assert user.is_active
+        assert not user.is_org_admin
+
+    def test_invited_registration_roleless_invite_cannot_gain_role_from_body(
+        self, request_factory, org_admin, mock_uom_lookup
+    ):
+        # perform_invite defaults user_role to [] (falsy) when the inviter leaves
+        # it blank. A field the token does not carry must not be supplied by the
+        # body either, so the body cannot use a role-less invite to pick "Admins".
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'invited-roleless-escalation@example.com'
+        data['email'] = 'invited-roleless-escalation@example.com'
+        token = create_invitation_token(data['email'], org_admin.organization, [])
+        data['invitation_token'] = token
+        data['user_role'] = 'Admins'
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+
+        assert response.status_code == 400
+        assert not CoreUser.objects.filter(username=data['username']).exists()
+
+    def test_invited_registration_roleless_invite_gets_default_group(
+        self, request_factory, org_admin, mock_uom_lookup
+    ):
+        # Positive control for the role-less invite: honouring it (i.e. not
+        # supplying a role) still registers the user, and CoreUser.save()'s
+        # existing default-group assignment gives them the org's default
+        # (Users) role rather than no role or an escalated one.
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'invited-roleless-honest@example.com'
+        data['email'] = 'invited-roleless-honest@example.com'
+        data.pop('user_role', None)
+        token = create_invitation_token(data['email'], org_admin.organization, [])
+        data['invitation_token'] = token
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+        assert response.status_code == 201
+
+        user = CoreUser.objects.get(username=data['username'])
+        assert user.is_active
+        assert not user.is_org_admin
+        assert user.core_groups.filter(name='Users', is_default=True).exists()
+
+    def test_tokenless_registration_unaffected_by_invite_binding(self, request_factory, org_admin, mock_uom_lookup):
+        # tp-core-invite-binding must not touch the no-token self-signup path:
+        # an unrecognised organization_name still creates a new organization,
+        # and the resulting account is still active as before.
+        data = TEST_USER_DATA.copy()
+        data['username'] = 'self-signup@example.com'
+        data['email'] = 'self-signup@example.com'
+        data['organization_name'] = 'Brand New Self-Signup Org'
+        data['user_role'] = 'Admins'
+
+        request = request_factory.post(reverse('coreuser-list'), data)
+        response = CoreUserViewSet.as_view({'post': 'create'})(request)
+        assert response.status_code == 201
+
+        user = CoreUser.objects.get(username=data['username'])
+        assert user.organization.name == data['organization_name']
+        assert user.is_active
+        assert user.is_org_admin
+
 
 @pytest.mark.django_db()
 class TestCoreUserUpdate:
