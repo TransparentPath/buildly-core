@@ -119,7 +119,7 @@ class TestCoreUserCreate:
         # check this user is org admin
         assert user.is_org_admin
 
-    def test_registration_of_second_org_user(self, request_factory, org_admin):
+    def test_registration_of_second_org_user(self, request_factory, org_admin, mock_uom_lookup):
         request = request_factory.post(reverse('coreuser-list'), TEST_USER_DATA)
         response = CoreUserViewSet.as_view({'post': 'create'})(request)
         assert response.status_code == 201
@@ -134,7 +134,7 @@ class TestCoreUserCreate:
         # check this user is org admin as well
         assert user.is_org_admin
 
-    def test_registration_of_invited_org_user(self, request_factory, org_admin):
+    def test_registration_of_invited_org_user(self, request_factory, org_admin, mock_uom_lookup):
         data = TEST_USER_DATA.copy()
         token = create_invitation_token(data['email'], org_admin.organization, data['user_role'])
         data['invitation_token'] = token
