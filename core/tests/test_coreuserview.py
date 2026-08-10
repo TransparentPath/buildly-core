@@ -57,6 +57,114 @@ def test_coreuser_views_permissions_unauth(request_factory):
     response = CoreUserViewSet.as_view({'patch': 'partial_update'})(request, pk=1)
     assert response.status_code == 403
 
+    # has no permission
+    request = request_factory.delete(reverse('coreuser-detail', args=(1,)))
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=1)
+    assert response.status_code == 403
+
+    # has no permission
+    request = request_factory.patch(reverse('coreuser-update-profile', args=(1,)))
+    response = CoreUserViewSet.as_view({'patch': 'update_profile'})(request, pk=1)
+    assert response.status_code == 403
+
+    # has no permission
+    request = request_factory.get(reverse('coreuser-me'))
+    response = CoreUserViewSet.as_view({'get': 'me'})(request)
+    assert response.status_code == 403
+
+    # has no permission
+    for action_ in ('alert', 'status_alert', 'battery_alert', 'email_shipment_report'):
+        request = request_factory.post(reverse(f'coreuser-{action_.replace("_", "-")}'))
+        response = CoreUserViewSet.as_view({'post': action_})(request)
+        assert response.status_code == 403, action_
+
+
+@pytest.mark.django_db()
+def test_coreuser_alert_authenticated_still_allowed(request_factory, org_member):
+    """
+    Service-to-service callers (pushnotification_service) authenticate with a
+    Bearer token, so closing the alert endpoints must not break them.
+    """
+    request = request_factory.post(
+        reverse('coreuser-alert'),
+        {'organization_uuid': str(org_member.organization.organization_uuid),
+         'messages': []},
+        format='json',
+    )
+    request.user = org_member
+    response = CoreUserViewSet.as_view({'post': 'alert'})(request)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db()
+def test_coreuser_destroy_anonymous_does_not_delete(request_factory, org_member):
+    """An anonymous DELETE must be refused and must not delete the user."""
+    pk = org_member.pk
+    request = request_factory.delete(reverse('coreuser-detail', args=(pk,)))
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=pk)
+    assert response.status_code == 403
+    assert CoreUser.objects.filter(pk=pk).exists()
+
+
+@pytest.mark.django_db()
+def test_coreuser_destroy_org_member_forbidden(request_factory, org_member, org):
+    """An authenticated non-admin cannot delete another user in their own org."""
+    victim = factories.CoreUser.create(
+        organization=org, username='victim@example.com', email='victim@example.com'
+    )
+    request = request_factory.delete(reverse('coreuser-detail', args=(victim.pk,)))
+    request.user = org_member
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=victim.pk)
+    assert response.status_code == 403
+    assert CoreUser.objects.filter(pk=victim.pk).exists()
+
+
+@pytest.mark.django_db()
+def test_coreuser_destroy_org_admin_same_org_succeeds(request_factory, org_admin, org):
+    """An org admin can delete a user inside their own organization."""
+    victim = factories.CoreUser.create(
+        organization=org, username='victim2@example.com', email='victim2@example.com'
+    )
+    request = request_factory.delete(reverse('coreuser-detail', args=(victim.pk,)))
+    request.user = org_admin
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=victim.pk)
+    assert response.status_code == 204
+    assert not CoreUser.objects.filter(pk=victim.pk).exists()
+
+
+@pytest.mark.django_db()
+def test_coreuser_destroy_org_admin_other_org_forbidden(request_factory, org_admin):
+    """An org admin cannot delete a user belonging to a different organization."""
+    other_org = factories.Organization.create(name='Some Other Org')
+    victim = factories.CoreUser.create(
+        organization=other_org,
+        username='outsider@example.com',
+        email='outsider@example.com',
+    )
+    request = request_factory.delete(reverse('coreuser-detail', args=(victim.pk,)))
+    request.user = org_admin
+    response = CoreUserViewSet.as_view({'delete': 'destroy'})(request, pk=victim.pk)
+    assert response.status_code == 403
+    assert CoreUser.objects.filter(pk=victim.pk).exists()
+
+
+@pytest.mark.django_db()
+def test_coreuser_update_profile_anonymous_forbidden(request_factory, org_member):
+    """An anonymous PATCH of update_profile must be refused."""
+    org_member.first_name = 'Untouched'
+    org_member.save()
+    request = request_factory.patch(
+        reverse('coreuser-update-profile', args=(org_member.pk,)),
+        {'organization_name': org_member.organization.name, 'first_name': 'Hacked'},
+        format='json',
+    )
+    response = CoreUserViewSet.as_view({'patch': 'update_profile'})(
+        request, pk=org_member.pk
+    )
+    assert response.status_code == 403
+    org_member.refresh_from_db()
+    assert org_member.first_name == 'Untouched'
+
 
 @pytest.mark.django_db()
 def test_coreuser_views_permissions_org_member(request_factory, org_member):

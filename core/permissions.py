@@ -62,11 +62,17 @@ class IsSuperUser(permissions.BasePermission):
 
 
 class AllowAuthenticatedRead(permissions.BasePermission):
+    """
+    Require an authenticated user for every request.
+
+    Previously only safe (read) methods were checked, so anonymous callers were
+    granted unconditional access to POST/PUT/PATCH/DELETE on any view using this
+    class. Finer-grained authorization is the job of the per-action permissions
+    in each viewset's ``get_permissions()``.
+    """
+
     def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            if request.user.is_anonymous:
-                return False
-        return True
+        return not request.user.is_anonymous
 
 
 class AllowOnlyOrgAdmin(permissions.BasePermission):
