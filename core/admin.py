@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.models import (
@@ -8,6 +9,7 @@ from core.models import (
     CoreSites,
     EmailTemplate,
     Industry,
+    Invitation,
     LogicModule,
     Organization,
     OrganizationType,
@@ -138,6 +140,15 @@ class PasswordResetCodeAdmin(admin.ModelAdmin):
     list_display = ('user', 'code', 'expires_at', 'is_used')
 
 
+class InvitationAdmin(admin.ModelAdmin):
+    list_display = ('email', 'organization', 'status', 'expires_at', 'reinvite_count')
+    actions = ['cancel_invitations']
+
+    @admin.action(description='Cancel selected invitations')
+    def cancel_invitations(self, request, queryset):
+        queryset.update(status=Invitation.STATUS_CANCELLED, cancelled_at=timezone.now())
+
+
 admin.site.register(LogicModule, LogicModuleAdmin)
 admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(OrganizationType, OrganizationTypeAdmin)
@@ -148,3 +159,4 @@ admin.site.register(EmailTemplate, EmailTemplateAdmin)
 admin.site.register(Industry)
 admin.site.register(Consortium)
 admin.site.register(PasswordResetCode, PasswordResetCodeAdmin)
+admin.site.register(Invitation, InvitationAdmin)

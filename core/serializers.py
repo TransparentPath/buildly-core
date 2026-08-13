@@ -486,6 +486,17 @@ class CoreUserInvitationSerializer(serializers.Serializer):
     user_role = serializers.CharField(required=False)
 
 
+class CoreUserInvitationResendSerializer(serializers.Serializer):
+    """
+    The body carries the token, not the email -- this is the anti-tampering
+    hinge. There is no user-supplied value in the request that isn't
+    covered by the signature, so there is nothing to edit; an attacker who
+    changes the email inside the token invalidates the signature.
+    """
+
+    token = serializers.CharField()
+
+
 class CoreUserResetPasswordSerializer(serializers.Serializer):
     """Serializer for reset password request data
     """

@@ -1,5 +1,7 @@
 import uuid
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.sites.models import Site
@@ -431,6 +433,115 @@ class PasswordResetCode(models.Model):
 
     def is_valid(self) -> bool:
         return not self.is_used and self.expires_at > timezone.now()
+
+
+class Invitation(models.Model):
+    """
+    A stored, single-use record of an invitation link, styled on
+    PasswordResetCode above: no separate "expired" state -- validity is
+    derived from `expires_at`, exactly as `PasswordResetCode.is_valid()`
+    derives its own, so no cron job is needed to flip rows.
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_SUPERSEDED = 'superseded'
+    STATUS_CHOICES = (
+        (STATUS_PENDING, STATUS_PENDING),
+        (STATUS_ACCEPTED, STATUS_ACCEPTED),
+        (STATUS_CANCELLED, STATUS_CANCELLED),
+        (STATUS_SUPERSEDED, STATUS_SUPERSEDED),
+    )
+
+    # `jti` claim added to the JWT payload so a presented link resolves to
+    # one exact record, instead of merely "some invite sent to this address".
+    token_jti = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    # Indexed because every lookup path that isn't by `jti` (repeat-invite
+    # supersede, admin search) is by address.
+    email = models.EmailField(db_index=True)
+    # FK, not a name: a rename must not orphan the record, and a re-mint
+    # must carry the organisation's *current* name (see plan finding F3).
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='invitations',
+    )
+    # Audit only: lets support see the name the recipient was shown, when
+    # it differs from the organization's name today.
+    organization_name_at_issue = models.CharField(max_length=255, blank=True)
+    # Mirrors the token claim so a re-mint reproduces the original role
+    # without re-deriving it.
+    user_role = models.CharField(max_length=255, blank=True)
+    # SET_NULL, not CASCADE: deleting an admin must not delete the
+    # invitation audit trail.
+    invited_by = models.ForeignKey(
+        CoreUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sent_invitations',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    # The *current* deadline; a re-mint moves it forward.
+    expires_at = models.DateTimeField()
+    # Frozen at first issue. The re-request window is measured from this,
+    # so successive re-mints cannot walk the window forward indefinitely.
+    original_expires_at = models.DateTimeField()
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    # The cap and cooldown counters live on the row, not in a cache -- see
+    # the rate-limiting design (no shared cache is configured).
+    reinvite_count = models.PositiveSmallIntegerField(default=0)
+    last_reinvite_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'Invitation'
+        verbose_name_plural = 'Invitations'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['email'],
+                condition=models.Q(status='pending'),
+                name='unique_pending_invitation_per_email',
+            ),
+        ]
+
+    def is_valid(self) -> bool:
+        return self.status == self.STATUS_PENDING and self.expires_at > timezone.now()
+
+    def is_expired(self) -> bool:
+        return self.status == self.STATUS_PENDING and self.expires_at <= timezone.now()
+
+    @property
+    def reinvite_window_closes_at(self):
+        return self.original_expires_at + timedelta(days=settings.INVITATION_REINVITE_WINDOW_DAYS)
+
+    def can_reinvite(self):
+        """
+        The single authority both `invite_check` and `invite_resend`
+        consult on whether this invitation is even in scope for a re-mint.
+        `invite_resend` layers its own cap/cooldown check on top of a
+        `True` result here; `invite_check` uses the `False` reason to pick
+        between 'expired' and 'expired_window_closed'.
+
+        A never-yet-renewed invitation must actually be expired before it
+        can be renewed -- a still-valid link has nothing to renew, and that
+        is deliberately indistinguishable from any other not-renewable
+        state (see the disclosure design). But a *successful* re-mint
+        moves `expires_at` forward, which makes `is_expired()` false again
+        -- that must not itself block a too-soon second click from being
+        recognised as "cooldown" rather than "not_renewable"; cap/cooldown
+        already govern how often that's allowed once `reinvite_count > 0`.
+        """
+        if self.status != self.STATUS_PENDING:
+            return False, 'not_renewable'
+        if timezone.now() > self.reinvite_window_closes_at:
+            return False, 'expired_window_closed'
+        if self.reinvite_count == 0 and not self.is_expired():
+            return False, 'not_renewable'
+        return True, None
 
 
 class LogicModule(models.Model):

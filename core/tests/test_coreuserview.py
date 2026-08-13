@@ -1,14 +1,21 @@
 import json
 import re
-from datetime import timedelta
+import uuid
+from datetime import datetime, timedelta, timezone as dt_timezone
+from unittest import mock
 
+import jwt
 import pytest
+from django.conf import settings
 from django.core import mail
+from django.core.cache import cache
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.reverse import reverse
+from rest_framework.throttling import ScopedRateThrottle
 
 import factories
-from core.models import CoreUser, PasswordResetCode
+from core.models import CoreUser, Invitation, Organization, PasswordResetCode
 from core.views import CoreUserViewSet
 from core.jwt_utils import create_invitation_token
 from core.tests.fixtures import (
@@ -436,8 +443,33 @@ class TestCoreUserUpdate:
         assert set(coreuser.core_groups.all()) == set(new_groups)
 
 
+def _tamper_token(token):
+    """Flip a character inside the payload segment, leaving the header and
+    signature untouched, so the signature no longer matches."""
+    header, payload, signature = token.split('.')
+    chars = list(payload)
+    idx = len(chars) // 2
+    chars[idx] = 'a' if chars[idx] != 'a' else 'b'
+    return f'{header}.{"".join(chars)}.{signature}'
+
+
+def _resign_with_other_key(token):
+    """Decode the payload as-is (unmodified) and re-sign it with a
+    different key, proving the signature -- not the payload shape -- is
+    the gate."""
+    decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'], options={'verify_exp': False})
+    return jwt.encode(decoded, 'a-different-secret-key', algorithm='HS256')
+
+
 @pytest.mark.django_db()
 class TestCoreUserInvite:
+    @pytest.fixture(autouse=True)
+    def _clear_throttle_cache(self):
+        # ScopedRateThrottle's LocMemCache state is per-process and would
+        # otherwise carry request counts across tests in this class.
+        cache.clear()
+        yield
+
     def test_invitation(self, request_factory, org_admin):
         data = {'emails': [TEST_USER_DATA['email']], 'org_data': json.dumps({ 'name': TEST_USER_DATA['organization_name'] }), 'user_role': TEST_USER_DATA['user_role']}
         request = request_factory.post(reverse('coreuser-invite'), data)
@@ -467,6 +499,446 @@ class TestCoreUserInvite:
         )
         response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
         assert response.status_code == 401
+
+    # -- Security-property cases: these prove the design (plan §7). --
+
+    def test_edited_link_is_refused(self, request_factory, org):
+        invitation = factories.Invitation(organization=org)
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+        tampered = _tamper_token(token)
+
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': tampered})
+        response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert response.status_code == 401
+        assert response.data['reason'] == 'invalid'
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': tampered})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'not_renewable'
+        assert len(mail.outbox) == 0
+
+    def test_token_signed_with_other_key_is_refused(self, request_factory, org):
+        invitation = factories.Invitation(organization=org)
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+        re_signed = _resign_with_other_key(token)
+
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': re_signed})
+        response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert response.status_code == 401
+        assert response.data['reason'] == 'invalid'
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': re_signed})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'not_renewable'
+        assert len(mail.outbox) == 0
+
+    def test_link_with_no_stored_record_is_refused(self, request_factory, org):
+        # Legacy-shape (no `jti`) token, already expired, with no Invitation row.
+        payload = {
+            'email': 'ghost@example.com',
+            'organization_name': org.name,
+            'user_role': 'Users',
+            'exp': timezone.now() - timedelta(hours=1),
+        }
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': token})
+        response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert response.status_code == 401
+        assert response.data['reason'] == 'no_record'
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'not_renewable'
+        assert len(mail.outbox) == 0
+
+    def test_cancelled_invitation_is_refused(self, request_factory, org):
+        invitation = factories.Invitation(organization=org, status=Invitation.STATUS_CANCELLED)
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'not_renewable'
+        assert len(mail.outbox) == 0
+
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': token})
+        cancelled_response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert cancelled_response.status_code == 401
+        assert cancelled_response.data == {
+            'detail': 'This invitation is no longer on record.', 'reason': 'no_record',
+        }
+
+        # Byte-identical to the unknown-jti / never-recorded case.
+        unknown_payload = {
+            'email': 'nobody@example.com',
+            'organization_name': org.name,
+            'user_role': 'Users',
+            'jti': str(uuid.uuid4()),
+            'exp': timezone.now() - timedelta(hours=1),
+        }
+        unknown_token = jwt.encode(unknown_payload, settings.SECRET_KEY, algorithm='HS256')
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': unknown_token})
+        no_record_response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert no_record_response.status_code == 401
+        assert no_record_response.data == cancelled_response.data
+
+    def test_reinvite_cooldown_holds(self, request_factory, org):
+        invitation = factories.Invitation(
+            organization=org,
+            expires_at=timezone.now() - timedelta(hours=1),
+            original_expires_at=timezone.now() - timedelta(hours=1),
+        )
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'sent'
+        sent_count = len(mail.outbox)
+        assert sent_count > 0
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'cooldown'
+        assert len(mail.outbox) == sent_count
+
+        invitation.refresh_from_db()
+        invitation.last_reinvite_at = invitation.last_reinvite_at - timedelta(minutes=16)
+        invitation.save(update_fields=['last_reinvite_at'])
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'sent'
+        assert len(mail.outbox) > sent_count
+
+    def test_reinvite_cap_holds(self, request_factory, org):
+        invitation = factories.Invitation(
+            organization=org,
+            expires_at=timezone.now() - timedelta(hours=1),
+            original_expires_at=timezone.now() - timedelta(hours=1),
+            reinvite_count=settings.INVITATION_REINVITE_MAX_COUNT,
+        )
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'cap_reached'
+        assert len(mail.outbox) == 0
+
+    def test_reinvite_window_closes(self, request_factory, org):
+        original_expires_at = timezone.now() - timedelta(days=31)
+        invitation = factories.Invitation(
+            organization=org,
+            expires_at=original_expires_at,
+            original_expires_at=original_expires_at,
+        )
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': token})
+        response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert response.status_code == 401
+        assert response.data['reason'] == 'expired_window_closed'
+        assert 'can_request_new' not in response.data
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'not_renewable'
+        assert len(mail.outbox) == 0
+
+    def test_reinvite_does_not_touch_organization_or_uom(self, request_factory, org):
+        invitation = factories.Invitation(
+            organization=org,
+            expires_at=timezone.now() - timedelta(hours=1),
+            original_expires_at=timezone.now() - timedelta(hours=1),
+        )
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+        org_count = Organization.objects.count()
+
+        with mock.patch('core.views.coreuser.requests.post') as mocked_post:
+            request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+            response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+
+        assert response.status_code == 200
+        assert response.data['reason'] == 'sent'
+        mocked_post.assert_not_called()
+        assert Organization.objects.count() == org_count
+
+    def test_reinvite_of_registered_email_sends_nothing(self, request_factory, org):
+        invitation = factories.Invitation(
+            organization=org,
+            expires_at=timezone.now() - timedelta(hours=1),
+            original_expires_at=timezone.now() - timedelta(hours=1),
+        )
+        factories.CoreUser.create(
+            email=invitation.email, username=invitation.email, organization=org,
+        )
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'not_renewable'
+        assert len(mail.outbox) == 0
+
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': token})
+        response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert response.status_code == 401
+        assert response.data['reason'] == 'already_registered'
+
+    def test_reinvite_window_measured_from_original_expiry(self, request_factory, org):
+        original_expires_at = timezone.now() - timedelta(hours=1)
+        invitation = factories.Invitation(
+            organization=org,
+            expires_at=original_expires_at,
+            original_expires_at=original_expires_at,
+        )
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.status_code == 200
+        assert response.data['reason'] == 'sent'
+
+        invitation.refresh_from_db()
+        assert invitation.original_expires_at == original_expires_at
+        assert invitation.expires_at > original_expires_at
+        assert invitation.reinvite_window_closes_at == (
+            original_expires_at + timedelta(days=settings.INVITATION_REINVITE_WINDOW_DAYS)
+        )
+
+    # -- Behavioural cases. --
+
+    def test_invite_creates_invitation_record(self, request_factory, org_admin):
+        data = {
+            'emails': [TEST_USER_DATA['email']],
+            'org_data': json.dumps({'name': TEST_USER_DATA['organization_name']}),
+            'user_role': TEST_USER_DATA['user_role'],
+        }
+        request = request_factory.post(reverse('coreuser-invite'), data)
+        request.user = org_admin
+        response = CoreUserViewSet.as_view({'post': 'invite'})(request)
+        assert response.status_code == 200
+
+        invitation = Invitation.objects.get(email=TEST_USER_DATA['email'])
+        assert invitation.status == Invitation.STATUS_PENDING
+        assert invitation.organization == org_admin.organization
+        assert invitation.invited_by == org_admin
+        expected_expiry = timezone.now() + timedelta(hours=settings.INVITATION_EXPIRE_HOURS)
+        assert abs((invitation.expires_at - expected_expiry).total_seconds()) < 5
+
+        token = response.data['invitations'][0].split('token=')[1]
+        decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        assert decoded['jti'] == str(invitation.token_jti)
+
+    def test_invite_supersedes_prior_pending_invitation(self, request_factory, org_admin):
+        data = {
+            'emails': [TEST_USER_DATA['email']],
+            'org_data': json.dumps({'name': TEST_USER_DATA['organization_name']}),
+            'user_role': TEST_USER_DATA['user_role'],
+        }
+        request = request_factory.post(reverse('coreuser-invite'), data)
+        request.user = org_admin
+        CoreUserViewSet.as_view({'post': 'invite'})(request)
+        first = Invitation.objects.get(email=TEST_USER_DATA['email'], status=Invitation.STATUS_PENDING)
+
+        request = request_factory.post(reverse('coreuser-invite'), data)
+        request.user = org_admin
+        CoreUserViewSet.as_view({'post': 'invite'})(request)
+
+        first.refresh_from_db()
+        assert first.status == Invitation.STATUS_SUPERSEDED
+        pending = Invitation.objects.filter(email=TEST_USER_DATA['email'], status=Invitation.STATUS_PENDING)
+        assert pending.count() == 1
+        assert pending.first().pk != first.pk
+
+    def test_superseded_link_reports_newer_invitation(self, request_factory, org_admin):
+        data = {
+            'emails': [TEST_USER_DATA['email']],
+            'org_data': json.dumps({'name': TEST_USER_DATA['organization_name']}),
+            'user_role': TEST_USER_DATA['user_role'],
+        }
+        request = request_factory.post(reverse('coreuser-invite'), data)
+        request.user = org_admin
+        response = CoreUserViewSet.as_view({'post': 'invite'})(request)
+        old_token = response.data['invitations'][0].split('token=')[1]
+
+        request = request_factory.post(reverse('coreuser-invite'), data)
+        request.user = org_admin
+        CoreUserViewSet.as_view({'post': 'invite'})(request)
+
+        mail.outbox.clear()
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': old_token})
+        response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert response.status_code == 401
+        assert response.data['reason'] == 'superseded'
+        assert 'can_request_new' not in response.data
+
+        request = request_factory.post(reverse('coreuser-invite-resend'), {'token': old_token})
+        response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+        assert response.data['reason'] == 'not_renewable'
+        assert len(mail.outbox) == 0
+
+    def test_unexpired_legacy_link_still_registers(self, request_factory, org):
+        # No `jti` -- the deploy-day tolerance rule for pre-change links.
+        token = create_invitation_token(TEST_USER_DATA['email'], org, TEST_USER_DATA['user_role'])
+        request = request_factory.get(reverse('coreuser-invite-check'), {'token': token})
+        response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+        assert response.status_code == 200
+        assert response.data['email'] == TEST_USER_DATA['email']
+        assert 'reason' not in response.data
+
+    def test_reinvite_notifies_three_parties(self, request_factory, org_admin):
+        invitation = factories.Invitation(
+            organization=org_admin.organization,
+            invited_by=org_admin,
+            expires_at=timezone.now() - timedelta(hours=1),
+            original_expires_at=timezone.now() - timedelta(hours=1),
+        )
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+
+        with override_settings(SUPPORT_EMAIL_ADDRESS=['support@transparentpath.com']):
+            request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+            response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+
+        assert response.status_code == 200
+        assert response.data['reason'] == 'sent'
+        assert len(mail.outbox) == 2
+        to_lists = [message.to for message in mail.outbox]
+        assert [invitation.email] in to_lists
+        assert [org_admin.email] in to_lists
+        for message in mail.outbox:
+            assert message.cc == ['support@transparentpath.com']
+
+    def test_invite_check_reason_codes(self, request_factory, org):
+        registered_invitation = factories.Invitation(organization=org)
+        factories.CoreUser.create(
+            email=registered_invitation.email, username=registered_invitation.email, organization=org,
+        )
+        superseded_invitation = factories.Invitation(organization=org, status=Invitation.STATUS_SUPERSEDED)
+        expired_in_window = factories.Invitation(
+            organization=org,
+            expires_at=timezone.now() - timedelta(hours=1),
+            original_expires_at=timezone.now() - timedelta(hours=1),
+        )
+        expired_window_closed = factories.Invitation(
+            organization=org,
+            expires_at=timezone.now() - timedelta(days=31),
+            original_expires_at=timezone.now() - timedelta(days=31),
+        )
+        valid_pending = factories.Invitation(organization=org)
+
+        cases = [
+            (None, 401, 'invalid'),
+            (jwt.encode(
+                {
+                    'email': 'nobody@example.com', 'organization_name': org.name, 'user_role': 'Users',
+                    'jti': str(uuid.uuid4()), 'exp': timezone.now() - timedelta(hours=1),
+                },
+                settings.SECRET_KEY, algorithm='HS256',
+            ), 401, 'no_record'),
+            (create_invitation_token(
+                registered_invitation.email, registered_invitation.organization,
+                registered_invitation.user_role, registered_invitation.token_jti,
+            ), 401, 'already_registered'),
+            (create_invitation_token(
+                superseded_invitation.email, superseded_invitation.organization,
+                superseded_invitation.user_role, superseded_invitation.token_jti,
+            ), 401, 'superseded'),
+            (create_invitation_token(
+                expired_in_window.email, expired_in_window.organization,
+                expired_in_window.user_role, expired_in_window.token_jti,
+            ), 401, 'expired'),
+            (create_invitation_token(
+                expired_window_closed.email, expired_window_closed.organization,
+                expired_window_closed.user_role, expired_window_closed.token_jti,
+            ), 401, 'expired_window_closed'),
+            (create_invitation_token(
+                valid_pending.email, valid_pending.organization,
+                valid_pending.user_role, valid_pending.token_jti,
+            ), 200, None),
+        ]
+
+        for token, expected_status, expected_reason in cases:
+            params = {'token': token} if token is not None else {}
+            request = request_factory.get(reverse('coreuser-invite-check'), params)
+            response = CoreUserViewSet.as_view({'get': 'invite_check'})(request)
+            assert response.status_code == expected_status
+            if expected_reason is None:
+                assert 'reason' not in response.data
+            else:
+                assert response.data['reason'] == expected_reason
+
+    def test_invitation_expiry_is_72_hours(self, request_factory, org_admin):
+        assert settings.INVITATION_EXPIRE_HOURS == 72
+        data = {
+            'emails': [TEST_USER_DATA['email']],
+            'org_data': json.dumps({'name': TEST_USER_DATA['organization_name']}),
+            'user_role': TEST_USER_DATA['user_role'],
+        }
+        request = request_factory.post(reverse('coreuser-invite'), data)
+        request.user = org_admin
+        response = CoreUserViewSet.as_view({'post': 'invite'})(request)
+        token = response.data['invitations'][0].split('token=')[1]
+
+        decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        actual_exp = datetime.fromtimestamp(decoded['exp'], tz=dt_timezone.utc)
+        expected_exp = timezone.now() + timedelta(hours=72)
+        assert abs((actual_exp - expected_exp).total_seconds()) < 5
+
+        message = mail.outbox[-1]
+        assert '72 hours' in message.body
+
+    def test_throttle_returns_429(self, request_factory, org):
+        invitation = factories.Invitation(
+            organization=org,
+            expires_at=timezone.now() - timedelta(hours=1),
+            original_expires_at=timezone.now() - timedelta(hours=1),
+        )
+        token = create_invitation_token(
+            invitation.email, invitation.organization, invitation.user_role, invitation.token_jti
+        )
+
+        # `ScopedRateThrottle.THROTTLE_RATES` is a snapshot taken from
+        # `api_settings` at import time, not a live setting -- overriding
+        # `settings.REST_FRAMEWORK` doesn't reach it, so the rate itself
+        # has to be patched directly to exercise the throttle in a test.
+        with mock.patch.object(ScopedRateThrottle, 'THROTTLE_RATES', {'invite_resend': '1/hour'}):
+            request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+            response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+            assert response.status_code == 200
+
+            request = request_factory.post(reverse('coreuser-invite-resend'), {'token': token})
+            response = CoreUserViewSet.as_view({'post': 'invite_resend'})(request)
+            assert response.status_code == 429
+            assert 'reason' not in response.data
 
 
 @pytest.mark.django_db()
