@@ -3,11 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <title>You're invited</title>
+    <title>Invitation re-sent</title>
   </head>
   <body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'IBM Plex Sans', Arial, sans-serif;">
     <table role="presentation" align="center" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5; padding:40px 0;">
@@ -22,40 +18,37 @@
                   width="150"
                   style="display:block; margin-bottom:28px;"
                 />
-                <h1 style="margin:0 0 16px 0; font-size:26px; font-weight:600; color:#1a1a2e;">You're invited to join {{ organization_name }}</h1>
+                <h1 style="margin:0 0 16px 0; font-size:26px; font-weight:600; color:#1a1a2e;">Invitation re-sent</h1>
                 <p style="margin:0 0 24px 0; font-size:16px; line-height:1.5; color:#3f4254;">
-                  You've been invited to join {{ organization_name }} on Transparent Path as
-                  {% with first=role|make_list|first|lower %}{% if first in "aeiou" %}an{% else %}a{% endif %}{% endwith %} {{ role }}.
-                  Accept your invitation to set up your account and start tracking shipments.
+                  An invitation you sent to {{ email }} for {{ organization_name }} had expired, and a fresh one has just been sent to them.
                 </p>
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f2ee; border-radius:10px; margin-bottom:28px;">
                   <tr>
                     <td style="padding:20px 24px 12px 24px;">
+                      <span style="display:block; font-size:12px; font-weight:600; letter-spacing:1px; color:#8a8d98; text-transform:uppercase;">Email</span>
+                      <span style="display:block; font-size:17px; font-weight:600; color:#1a1a2e; padding-top:2px;">{{ email }}</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 24px 12px 24px;">
                       <span style="display:block; font-size:12px; font-weight:600; letter-spacing:1px; color:#8a8d98; text-transform:uppercase;">Organization</span>
                       <span style="display:block; font-size:17px; font-weight:600; color:#1a1a2e; padding-top:2px;">{{ organization_name }}</span>
                     </td>
                   </tr>
                   <tr>
-                    <td style="padding:0 24px 20px 24px;">
-                      <span style="display:block; font-size:12px; font-weight:600; letter-spacing:1px; color:#8a8d98; text-transform:uppercase;">Your Role</span>
-                      <span style="display:block; font-size:17px; font-weight:600; color:#1a1a2e; padding-top:2px;">{{ role }}</span>
+                    <td style="padding:0 24px 12px 24px;">
+                      <span style="display:block; font-size:12px; font-weight:600; letter-spacing:1px; color:#8a8d98; text-transform:uppercase;">Re-sent</span>
+                      <span style="display:block; font-size:17px; font-weight:600; color:#1a1a2e; padding-top:2px;">{{ reinvite_count }} time(s) so far</span>
                     </td>
                   </tr>
-                </table>
-                <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 16px auto;">
                   <tr>
-                    <td align="center" style="background-color:#1f5c3d; border-radius:8px;">
-                      <a href="{{ invitation_link }}" target="_blank" style="display:inline-block; padding:16px 40px; font-size:16px; font-weight:600; color:#ffffff; text-decoration:none;">Register your account</a>
+                    <td style="padding:0 24px 20px 24px;">
+                      <span style="display:block; font-size:12px; font-weight:600; letter-spacing:1px; color:#8a8d98; text-transform:uppercase;">New expiry</span>
+                      <span style="display:block; font-size:17px; font-weight:600; color:#1a1a2e; padding-top:2px;">{{ expires_at }}</span>
                     </td>
                   </tr>
                 </table>
-                <p style="margin:0 0 28px 0; text-align:center; font-size:14px; color:#8a8d98;">This invitation expires in {{ expiry_hours }} hours</p>
-                <p style="margin:0 0 8px 0; font-size:14px; color:#3f4254;">Trouble with the button? Paste this link into your browser:</p>
-                <p style="margin:0 0 28px 0; font-size:14px; word-break:break-all;"><a href="{{ invitation_link }}" target="_blank" style="color:#1f5c3d; text-decoration:none;">{{ invitation_link }}</a></p>
-                {% if is_reinvite %}
-                <p style="margin:0 0 16px 0; font-size:14px; line-height:1.5; color:#3f4254;">Here's the fresh invitation link you requested.</p>
-                {% endif %}
-                <p style="margin:0; font-size:14px; line-height:1.5; color:#8a8d98;">If you weren't expecting this invitation, you can safely ignore this email — no account will be created.</p>
+                <p style="margin:0; font-size:14px; line-height:1.5; color:#8a8d98;">No action is needed from you unless {{ email }} continues to have trouble registering.</p>
                 <hr style="border:none; border-top:1px solid #ececec; margin:32px 0 20px 0;" />
                 <p style="margin:0 0 6px 0; text-align:center; font-size:14px; color:#737581;">Need help? <a href="mailto:support@transparentpath.com" style="color:#1f5c3d; font-weight:600; text-decoration:none;">support@transparentpath.com</a></p>
                 <p style="margin:0; text-align:center; font-size:13px; color:#9a9ca5;">&copy; {% now "Y" %} Transparent Path spc.</p>

@@ -155,7 +155,13 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',  # TODO check if disable, and also delete CSRF
         'rest_framework.authentication.TokenAuthentication',
     ],
-    'DEFAULT_PERMISSION_CLASSES': ('core.permissions.IsSuperUserBrowseableAPI',)
+    'DEFAULT_PERMISSION_CLASSES': ('core.permissions.IsSuperUserBrowseableAPI',),
+    # Global default stays empty so no existing endpoint's behaviour
+    # changes -- this is the narrowest possible introduction of throttling
+    # into a project that has none. Only `invite_resend` opts in, via its
+    # own `get_throttles()` override on CoreUserViewSet.
+    'DEFAULT_THROTTLE_CLASSES': [],
+    'DEFAULT_THROTTLE_RATES': {'invite_resend': '10/hour'},
     # ToDo: Think about `DEFAULT_PAGINATION_CLASS as env variable and
     #       customizable values with reasonable defaults
 }
@@ -169,7 +175,17 @@ RESETPASS_CONFIRM_URL_PATH = os.getenv(
 
 PASSWORD_RESET_TIMEOUT_DAYS = 1
 
-INVITATION_EXPIRE_HOURS = 168
+INVITATION_EXPIRE_HOURS = 72
+# Window, measured from the invitation's *original* expiry, in which an
+# expired invitation can still be re-requested. Measuring from the original
+# (not the current) expiry stops successive re-mints walking it forward.
+INVITATION_REINVITE_WINDOW_DAYS = 30
+# Three tries survives two lost/spam-filtered emails; past that, support or
+# the administrator should intervene rather than the recipient re-requesting.
+INVITATION_REINVITE_MAX_COUNT = 3
+# Matches PasswordResetCode's existing email retry cadence, so users and
+# support learn one interval.
+INVITATION_REINVITE_COOLDOWN_MINUTES = 15
 
 CORE_WEBSITE = "https://buildly.io"
 
