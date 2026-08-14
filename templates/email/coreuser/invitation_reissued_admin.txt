@@ -1,0 +1,13 @@
+Invitation re-sent
+
+An invitation you sent to {{ email }} for {{ organization_name }} had expired, and a fresh one has just been sent to them.
+
+EMAIL: {{ email }}
+ORGANIZATION: {{ organization_name }}
+RE-SENT: {{ reinvite_count }} time(s) so far
+NEW EXPIRY: {{ expires_at }}
+
+No action is needed from you unless {{ email }} continues to have trouble registering.
+
+Need help? support@transparentpath.com
+© {% now "Y" %} Transparent Path spc.

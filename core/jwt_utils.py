@@ -41,7 +41,12 @@ def payload_enricher(request):
     return {}
 
 
-def create_invitation_token(email_address: str, organization: Organization, user_role: str):
+def create_invitation_token(email_address: str, organization: Organization, user_role: str, jti=None):
+    """
+    `jti` identifies the exact `Invitation` row this token was minted for.
+    Pass `None` to mint a legacy-shape token (no `jti` claim) -- used only
+    by tests exercising the pre-change deploy-day tolerance rule.
+    """
     exp_hours = datetime.timedelta(hours=settings.INVITATION_EXPIRE_HOURS)
     payload = {
         'email': email_address,
@@ -49,4 +54,6 @@ def create_invitation_token(email_address: str, organization: Organization, user
         'user_role': user_role,
         'exp': datetime.datetime.utcnow() + exp_hours,
     }
+    if jti is not None:
+        payload['jti'] = str(jti)
     return jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')

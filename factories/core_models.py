@@ -8,6 +8,7 @@ from factory.django import DjangoModelFactory
 from core.models import (
     CoreUser as CoreUserM,
     CoreGroup as CoreGroupM,
+    Invitation as InvitationM,
     LogicModule as LogicModuleM,
     Organization as OrganizationM,
     PasswordResetCode as PasswordResetCodeM,
@@ -58,3 +59,15 @@ class PasswordResetCode(DjangoModelFactory):
     user = SubFactory(CoreUser)
     code = '123456'
     expires_at = LazyAttribute(lambda o: timezone.now() + timedelta(minutes=15))
+
+
+class Invitation(DjangoModelFactory):
+    class Meta:
+        model = InvitationM
+
+    email = Faker('email')
+    organization = SubFactory(Organization)
+    user_role = 'Users'
+    invited_by = SubFactory(CoreUser)
+    expires_at = LazyAttribute(lambda o: timezone.now() + timedelta(hours=72))
+    original_expires_at = LazyAttribute(lambda o: o.expires_at)

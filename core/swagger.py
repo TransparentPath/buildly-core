@@ -26,13 +26,43 @@ COREUSER_INVITE_CHECK_RESPONSE = {
         type='object',
         properties={
             'email': Schema(type='string'),
-            'organization': Schema(
-                type='object',
-                properties={
-                    'organization_uuid': Schema(type='string'),
-                    'name': Schema(type='string'),
-                },
+            'organization_name': Schema(type='string'),
+            'user_role': Schema(type='string'),
+            'expires_at': Schema(type='string', format='date-time'),
+        },
+    ),
+    401: Schema(
+        type='object',
+        properties={
+            'detail': Schema(type='string'),
+            'reason': Schema(
+                type='string',
+                enum=[
+                    'invalid',
+                    'no_record',
+                    'already_registered',
+                    'superseded',
+                    'expired',
+                    'expired_window_closed',
+                ],
             ),
+            'expires_at': Schema(type='string', format='date-time'),
+            'request_window_closes_at': Schema(type='string', format='date-time'),
+            'can_request_new': Schema(type='boolean'),
+        },
+    ),
+}
+
+COREUSER_INVITE_RESEND_RESPONSE = {
+    200: Schema(
+        type='object',
+        properties={
+            'detail': Schema(type='string'),
+            'reason': Schema(
+                type='string',
+                enum=['sent', 'cooldown', 'cap_reached', 'not_renewable'],
+            ),
+            'retry_after_seconds': Schema(type='integer'),
         },
     )
 }

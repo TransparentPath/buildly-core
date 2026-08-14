@@ -1,5 +1,4 @@
 import requests
-from urllib.parse import urljoin, quote
 
 from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -7,17 +6,20 @@ from django.core.files import File
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone as dj_timezone
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 import django_filters
 import jwt
 from drf_yasg.utils import swagger_auto_schema
-from core.models import CoreUser, Organization, CoreGroup, OrganizationType, PasswordResetCode
+from core.models import CoreUser, Organization, CoreGroup, OrganizationType, PasswordResetCode, Invitation
 from core.serializers import (
     CoreUserSerializer,
     CoreUserWritableSerializer,
     CoreUserInvitationSerializer,
+    CoreUserInvitationResendSerializer,
     CoreUserResetPasswordSerializer,
     CoreUserResetPasswordCheckSerializer,
     CoreUserResetPasswordConfirmSerializer,
@@ -27,20 +29,21 @@ from core.serializers import (
     CoreUserEmailShipmentReporSerializer,
 )
 
-from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsOrgMember
+from core.permissions import AllowAuthenticatedRead, AllowOnlyOrgAdmin, IsAnchoredOrgAdmin, IsSelf
 from core.swagger import (
     COREUSER_INVITE_RESPONSE,
     COREUSER_INVITE_CHECK_RESPONSE,
+    COREUSER_INVITE_RESEND_RESPONSE,
     COREUSER_RESETPASS_RESPONSE,
     DETAIL_RESPONSE,
     SUCCESS_RESPONSE,
     TOKEN_QUERY_PARAM,
 )
-from core.jwt_utils import create_invitation_token
+from core.invitations import issue_invitation_email
 from core.email_utils import send_email
 import logging
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pytz import timezone
 # from twilio.rest import Client
 logger = logging.getLogger(__name__)
@@ -83,6 +86,7 @@ class CoreUserViewSet(
         'partial_update': CoreUserWritableSerializer,
         'update_profile': CoreUserProfileSerializer,
         'invite': CoreUserInvitationSerializer,
+        'invite_resend': CoreUserInvitationResendSerializer,
         'reset_password': CoreUserResetPasswordSerializer,
         'reset_password_check': CoreUserResetPasswordCheckSerializer,
         'reset_password_confirm': CoreUserResetPasswordConfirmSerializer,
@@ -120,14 +124,13 @@ class CoreUserViewSet(
         return Response(serializer.data)
     
     def destroy(self, request, *args, **kwargs):
-        if AllowOnlyOrgAdmin():
-            user = self.get_object()
-            user.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        else:
-            return Response(
-                {'detail': 'Does not have permissions to perform the specified action.'}, status.HTTP_401_UNAUTHORIZED
-            )
+        # Authorization is enforced by get_permissions() (AllowOnlyOrgAdmin +
+        # IsAnchoredOrgAdmin) and, via get_object(), by IsAnchoredOrgAdmin's
+        # object-level check, which confines an org admin to users in the
+        # organization their own admin role belongs to.
+        user = self.get_object()
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=['GET'], detail=False)
     def me(self, request, *args, **kwargs):
@@ -136,44 +139,6 @@ class CoreUserViewSet(
         """
         user = request.user
         serializer = self.get_serializer(instance=user, context={'request': request})
-        return Response(serializer.data)
-
-    @action(methods=['GET'], detail=False)    
-    def performance_profiler(self, request, *args, **kwargs):
-        import cProfile, pstats, io
-        from pstats import SortKey
-        pr = cProfile.Profile()
-        pr.enable()
-
-        # actual implementation of getCoreUser
-        # Use this queryset or the django-filters lib will not work
-        queryset = self.filter_queryset(self.get_queryset())
-        
-        if not request.user.is_global_admin:
-            organization_id = request.user.organization_id
-
-            if request.user.is_org_admin:
-                reseller_orgs = [organization_id]
-                org = Organization.objects.get(pk=organization_id)
-                
-                if org.is_reseller and org.reseller_customer_orgs:
-                    reseller_orgs.extend(org.reseller_customer_orgs)
-                
-                queryset = queryset.filter(organization_id__in=reseller_orgs)
-            else:
-                queryset = queryset.filter(organization_id=organization_id)
-
-        serializer = self.get_serializer(
-            instance=queryset, context={'request': request}, many=True
-        )
-
-        pr.disable()
-        s = io.StringIO()
-        sortby = SortKey.CUMULATIVE
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue())
-
         return Response(serializer.data)
 
     @swagger_auto_schema(
@@ -214,41 +179,211 @@ class CoreUserViewSet(
     @action(methods=['GET'], detail=False)
     def invite_check(self, request, *args, **kwargs):
         """
-        This endpoint is used to validate invitation token and return
-        the information about email and organization
+        This endpoint is used to validate an invitation token and return
+        information about the invitation. Status codes are unchanged from
+        before invitations were tracked -- 200 on success, 401 on every
+        failure -- so this stays backwards compatible; the `reason` field
+        added to every failure body is purely additive.
         """
         try:
             token = self.request.query_params['token']
         except KeyError:
             return Response(
-                {'detail': 'No token is provided.'}, status.HTTP_401_UNAUTHORIZED
+                {'detail': 'No token is provided.', 'reason': 'invalid'}, status.HTTP_401_UNAUTHORIZED
             )
+
         try:
-            decoded = jwt.decode(token, settings.SECRET_KEY, algorithms='HS256')
+            # `verify_exp=False` reads an expired-but-authentic token's
+            # payload while still enforcing the signature -- a tampered or
+            # mis-signed token still raises DecodeError. Expiry is checked
+            # manually below, against the invitation record where one exists.
+            decoded = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=['HS256'], options={'verify_exp': False},
+            )
         except jwt.DecodeError:
             return Response(
-                {'detail': 'Token is not valid.'}, status.HTTP_401_UNAUTHORIZED
-            )
-        except jwt.ExpiredSignatureError:
-            return Response(
-                {'detail': 'Token is expired.'}, status.HTTP_401_UNAUTHORIZED
+                {'detail': 'Token is not valid.', 'reason': 'invalid'}, status.HTTP_401_UNAUTHORIZED
             )
 
-        if CoreUser.objects.filter(email=decoded['email']).exists():
+        token_expires_at = datetime.fromtimestamp(decoded['exp'], tz=timezone('UTC'))
+        token_is_expired = token_expires_at <= dj_timezone.now()
+        jti = decoded.get('jti')
+
+        if jti is None:
+            # Legacy (pre-change) link: no `jti` claim, so there is no
+            # Invitation row to consult. Behaves exactly as this endpoint
+            # did before invitations were tracked -- see the deploy-day
+            # tolerance rule.
+            if token_is_expired:
+                return Response(
+                    {'detail': 'This invitation is no longer on record.', 'reason': 'no_record'},
+                    status.HTTP_401_UNAUTHORIZED,
+                )
+            if CoreUser.objects.filter(email=decoded['email']).exists():
+                return Response(
+                    {'detail': 'Token has been used.', 'reason': 'already_registered'}, status.HTTP_401_UNAUTHORIZED
+                )
             return Response(
-                {'detail': 'Token has been used.'}, status.HTTP_401_UNAUTHORIZED
+                {
+                    'email': decoded['email'],
+                    'organization_name': decoded['organization_name'],
+                    'user_role': decoded['user_role'],
+                },
+                status=status.HTTP_200_OK,
             )
 
+        try:
+            invitation = Invitation.objects.select_related('organization').get(token_jti=jti)
+        except Invitation.DoesNotExist:
+            return Response(
+                {'detail': 'This invitation is no longer on record.', 'reason': 'no_record'},
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if CoreUser.objects.filter(email=invitation.email).exists():
+            return Response(
+                {'detail': 'Token has been used.', 'reason': 'already_registered'}, status.HTTP_401_UNAUTHORIZED
+            )
+
+        if invitation.status == Invitation.STATUS_CANCELLED:
+            # Byte-identical to the no_record body above -- cancellation is
+            # deliberately indistinguishable from "never recorded".
+            return Response(
+                {'detail': 'This invitation is no longer on record.', 'reason': 'no_record'},
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if invitation.status == Invitation.STATUS_SUPERSEDED:
+            return Response(
+                {'detail': 'A newer invitation has been sent.', 'reason': 'superseded'}, status.HTTP_401_UNAUTHORIZED
+            )
+
+        if invitation.status == Invitation.STATUS_ACCEPTED:
+            # The CoreUser check above already catches this in practice; a
+            # row marked accepted with no matching user is treated as no_record.
+            return Response(
+                {'detail': 'This invitation is no longer on record.', 'reason': 'no_record'},
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if invitation.is_valid():
+            if not token_is_expired:
+                return Response(
+                    {
+                        'email': invitation.email,
+                        # The current name, not the frozen `organization_name_at_issue`.
+                        'organization_name': invitation.organization.name,
+                        'user_role': invitation.user_role,
+                        'expires_at': invitation.expires_at,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            # A stale token while a live one (re-minted, same jti, later
+            # expiry) exists.
+            return Response(
+                {'detail': 'A newer invitation has been sent.', 'reason': 'superseded'}, status.HTTP_401_UNAUTHORIZED
+            )
+
+        can_reinvite, reason = invitation.can_reinvite()
+        if can_reinvite:
+            return Response(
+                {
+                    'detail': 'Token is expired.',
+                    'reason': 'expired',
+                    'expires_at': invitation.expires_at,
+                    'request_window_closes_at': invitation.reinvite_window_closes_at,
+                    'can_request_new': True,
+                },
+                status.HTTP_401_UNAUTHORIZED,
+            )
         return Response(
-            {'email': decoded['email'], 'organization_name': decoded['organization_name'], 'user_role': decoded['user_role']},
-            status=status.HTTP_200_OK,
+            {'detail': 'Token is expired.', 'reason': reason, 'expires_at': invitation.expires_at},
+            status.HTTP_401_UNAUTHORIZED,
         )
+
+    @swagger_auto_schema(
+        methods=['post'],
+        request_body=CoreUserInvitationResendSerializer,
+        responses=COREUSER_INVITE_RESEND_RESPONSE,
+    )
+    @action(methods=['POST'], detail=False)
+    def invite_resend(self, request, *args, **kwargs):
+        """
+        Mint a fresh token for an expired, on-record, in-window invitation
+        and send it. The request body carries only the original invitation
+        token -- no email, no organization, no role -- so there is no
+        user-supplied value that isn't covered by the signature. Every
+        outcome that isn't "a new invitation was actually sent" collapses
+        into the identical `not_renewable` body, so this endpoint cannot be
+        used to enumerate invitation or registration state.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data['token']
+
+        not_renewable = Response(
+            {'detail': 'This invitation cannot be renewed.', 'reason': 'not_renewable'}, status.HTTP_200_OK,
+        )
+
+        try:
+            decoded = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=['HS256'], options={'verify_exp': False},
+            )
+        except jwt.DecodeError:
+            return not_renewable
+
+        jti = decoded.get('jti')
+        if jti is None:
+            # Legacy link: no Invitation row can exist for it.
+            return not_renewable
+
+        with transaction.atomic():
+            try:
+                invitation = Invitation.objects.select_for_update().get(token_jti=jti)
+            except Invitation.DoesNotExist:
+                return not_renewable
+
+            if CoreUser.objects.filter(email=invitation.email).exists():
+                return not_renewable
+
+            can_reinvite, _ = invitation.can_reinvite()
+            if not can_reinvite:
+                return not_renewable
+
+            if invitation.reinvite_count >= settings.INVITATION_REINVITE_MAX_COUNT:
+                return Response(
+                    {
+                        'detail': 'This invitation has been re-sent the maximum number of times.',
+                        'reason': 'cap_reached',
+                    },
+                    status.HTTP_200_OK,
+                )
+
+            if invitation.last_reinvite_at is not None:
+                cooldown_ends_at = invitation.last_reinvite_at + timedelta(
+                    minutes=settings.INVITATION_REINVITE_COOLDOWN_MINUTES
+                )
+                retry_after = (cooldown_ends_at - dj_timezone.now()).total_seconds()
+                if retry_after > 0:
+                    return Response(
+                        {
+                            'detail': 'An invitation was sent recently. Please check your inbox.',
+                            'reason': 'cooldown',
+                            'retry_after_seconds': int(retry_after),
+                        },
+                        status.HTTP_200_OK,
+                    )
+
+            invitation.reinvite_count += 1
+            invitation.last_reinvite_at = dj_timezone.now()
+            invitation.save(update_fields=['reinvite_count', 'last_reinvite_at'])
+
+        issue_invitation_email(invitation, is_reinvite=True)
+
+        return Response({'detail': 'A new invitation has been sent.', 'reason': 'sent'}, status.HTTP_200_OK)
 
     @transaction.atomic
     def perform_invite(self, serializer):
-
-        reg_location = urljoin(settings.FRONTEND_URL, settings.REGISTRATION_URL_PATH)
-        reg_location = reg_location + '?token={}'
 
         email_addresses = serializer.validated_data.get('emails')
         org_data = serializer.validated_data.get('org_data')
@@ -314,39 +449,32 @@ class CoreUserViewSet(
                 requests.post(uom_url, data=org_language_data).json()
 
         registered_emails = CoreUser.objects.filter(email__in=email_addresses).values_list('email', flat=True)
+        invited_by = self.request.user if self.request.user.is_authenticated else None
 
         links = []
         for email_address in email_addresses:
             if email_address not in registered_emails:
-                # create or update an invitation
-                token = create_invitation_token(email_address, organization, user_role)
+                # Repeat invite to the same address: supersede, then create
+                # -- only one pending invitation is ever live per address,
+                # matching PasswordResetCode's is_used=True precedent for
+                # old, unused codes (never deleted).
+                Invitation.objects.filter(
+                    email=email_address, status=Invitation.STATUS_PENDING,
+                ).update(status=Invitation.STATUS_SUPERSEDED)
 
-                # build the invitation link
-                invitation_link = self.request.build_absolute_uri(
-                    reg_location.format(token)
+                expires_at = dj_timezone.now() + timedelta(hours=settings.INVITATION_EXPIRE_HOURS)
+                invitation = Invitation.objects.create(
+                    email=email_address,
+                    organization=organization,
+                    organization_name_at_issue=organization.name,
+                    user_role=user_role,
+                    invited_by=invited_by,
+                    expires_at=expires_at,
+                    original_expires_at=expires_at,
                 )
+
+                invitation_link = issue_invitation_email(invitation, is_reinvite=False)
                 links.append(invitation_link)
-
-                # compute the role display name for the E-mail templates
-                role_lower = user_role.lower()
-                if 'admins' in role_lower:
-                    role = 'Administrator'
-                elif role_lower == 'users' or role_lower.endswith('users'):
-                    role = 'User'
-                else:
-                    role = user_role[:-1] if user_role and user_role[-1].lower() == 's' else user_role
-
-                context = {
-                    'organization_name': organization.name,
-                    'role': role,
-                    'invitation_link': invitation_link,
-                }
-                subject = f"You're invited to join {organization.name} on Transparent Path"
-                template_name = 'email/coreuser/invitation.txt'
-                html_template_name = 'email/coreuser/invitation.html'
-                send_email(
-                    email_address, subject, context, template_name, html_template_name, cc_email_address=settings.SUPPORT_EMAIL_ADDRESS
-                )
 
         return links
 
@@ -488,16 +616,31 @@ class CoreUserViewSet(
                 'reset_password_check',
                 'reset_password_confirm',
                 'invite_check',
-                'update_profile',
+                'invite_resend',
             ]:
                 return [permissions.AllowAny()]
 
-            if self.action in ['update', 'partial_update', 'invite']:
-                return [AllowOnlyOrgAdmin(), IsOrgMember()]
-            if self.action in ['invite']:
-                return [AllowOnlyOrgAdmin(), IsOrgMember()]
+            if self.action in ['update', 'partial_update', 'invite', 'destroy']:
+                return [AllowOnlyOrgAdmin(), IsAnchoredOrgAdmin()]
+
+            # update_profile edits the caller's own record only -- no
+            # org-admin or global-admin branch. See core.permissions.IsSelf.
+            if self.action == 'update_profile':
+                return [AllowAuthenticatedRead(), IsSelf()]
 
         return super(CoreUserViewSet, self).get_permissions()
+
+    def get_throttles(self):
+        # Narrowest possible introduction of throttling: only invite_resend
+        # opts in (via `throttle_scope`, below), and DEFAULT_THROTTLE_CLASSES
+        # stays empty so no other endpoint's behaviour changes. Set as a
+        # class attribute rather than an `@action` kwarg so it also applies
+        # when the view is dispatched directly (as the test suite does),
+        # not only through a router.
+        if getattr(self, 'action', None) == 'invite_resend':
+            self.throttle_scope = 'invite_resend'
+            return [ScopedRateThrottle()]
+        return super(CoreUserViewSet, self).get_throttles()
 
     filterset_fields = ('organization__organization_uuid',)
     filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
