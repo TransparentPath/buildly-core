@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 class BaseSwaggerClient:
     """ Base for client class that is responsible for retrieving data from the service with Swagger spec"""
 
+    # Headers through which the gateway asserts the caller it has already
+    # verified. The services behind the gateway do not decode the forwarded
+    # token, so without these a request is authenticated but anonymous by the
+    # time a service sees it.
+    CORE_USER_UUID_HEADER = 'X-Core-User-Uuid'
+    CORE_ORGANIZATION_UUID_HEADER = 'X-Core-Organization-Uuid'
+
     def __init__(self, spec: Spec, incoming_request: Request):
         self._spec = spec
         self._in_request = incoming_request
@@ -144,6 +151,38 @@ class BaseSwaggerClient:
         }
         if self._in_request.content_type == 'application/json':
             headers['content-type'] = 'application/json'
+        headers.update(self._get_identity_headers())
+        return headers
+
+    def _get_identity_headers(self) -> dict:
+        """
+        Tell the service which user the gateway authenticated.
+
+        The values are read off the authenticated `CoreUser` only. The incoming
+        request's own headers are never copied into the outgoing set, so a
+        client that sends these headers itself cannot act as another user.
+
+        Both values are stringified: `core_user_uuid` is a CharField with a
+        `uuid.uuid4` default, so it holds a `UUID` until it round-trips through
+        the database, `organization_uuid` is a UUIDField, and aiohttp rejects
+        non-str header values. An absent value is omitted rather than sent as
+        'None', which a service could mistake for a real identity.
+        """
+        user = getattr(self._in_request, 'user', None)
+        if user is None or not user.is_authenticated:
+            return {}
+
+        headers = {}
+
+        core_user_uuid = getattr(user, 'core_user_uuid', None)
+        if core_user_uuid:
+            headers[self.CORE_USER_UUID_HEADER] = str(core_user_uuid)
+
+        organization = getattr(user, 'organization', None)
+        organization_uuid = getattr(organization, 'organization_uuid', None)
+        if organization_uuid:
+            headers[self.CORE_ORGANIZATION_UUID_HEADER] = str(organization_uuid)
+
         return headers
 
 
